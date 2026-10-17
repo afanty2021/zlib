@@ -78,9 +78,13 @@ EAPI 请求使用 `remix_userid`/`remix_userkey`。若登录端点拒绝账号�
 
 ## 域名白名单
 
-CLI 只接受 `1lib.sk`、`article.sk`、`articles.sk`、`z-lib.fm`、`z-lib.gd`、
-`z-lib.gl`、`z-lib.sk`、`z-library.ec`、`zlib.bz` 和 `zliba.ru`。这些域名的子域名
-也可以使用。配置值必须是 HTTPS 源站，不能包含端口、路径、查询或凭据。
+CLI 只接受 `1lib.sk`、`article.sk`、`articles.sk`、`bookabooki.fi`、
+`bookabooki.tw`、`lexlib.fi`、`lexlib.tw`、`librella.fi`、`librella.tw`、
+`z-lib.fm`、`z-lib.gd`、`z-lib.gl`、`z-lib.sk`、`z-library.ec`、`zlib.bz` 和
+`zliba.ru`。其中 librella/lexlib/bookabooki（.fi/.tw）是桌面端 App 发给捐赠者
+的个人域名层（2026-10-17 在桌面端配置中观察到），CLI 与桌面端使用相同的 remix
+cookie 认证，因此同样接受这些域名。这些域名的子域名也可以使用。配置值必须是
+HTTPS 源站，不能包含端口、路径、查询或凭据。
 
 2026-09-04 实测：`z-lib.gd`、`z-lib.gl`、`z-library.ec`、`article.sk`、
 `articles.sk`、`zlib.bz` 的 EAPI 可用；`1lib.sk`、`z-lib.fm`、`z-lib.sk` 被

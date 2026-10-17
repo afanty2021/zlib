@@ -13,10 +13,22 @@ import (
 // z-lib.gd, z-lib.gl, z-library.ec, zlib.bz, article.sk and articles.sk answer
 // /eapi/user/login directly; 1lib.sk, z-lib.fm and z-lib.sk self-redirect
 // behind DiamWall; zliba.ru is now a plain redirector to zlib.bz.
+//
+// librella/lexlib/bookabooki (.fi/.tw) are the personal-domain tier the
+// desktop app hands out to donors; they were observed in the desktop app's
+// own config (2026-10-17), and it authenticates there with the same remix
+// cookies this CLI uses. Measured the same day: all six answer
+// /eapi/info/domains with HTTP 200.
 var allowedDomainSuffixes = []string{
 	"1lib.sk",
 	"article.sk",
 	"articles.sk",
+	"bookabooki.fi",
+	"bookabooki.tw",
+	"lexlib.fi",
+	"lexlib.tw",
+	"librella.fi",
+	"librella.tw",
 	"z-lib.fm",
 	"z-lib.gd",
 	"z-lib.gl",
