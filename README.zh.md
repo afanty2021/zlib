@@ -22,6 +22,7 @@ Z-Library 命令行工具，搜索、下载图书并发送到 Kindle，你和 Cl
 
 🔍 **搜索** — 按年份、语言和格式筛选，结果可排序\
 📚 **浏览** — 收藏、推荐、热门图书和下载历史\
+📚 **系列与相关书** — 列出同系列册数或同主题推荐
 📥 **下载** — 查看书籍详情，选择下载目录\
 📖 **发送到 Kindle** — 把文件投递到你的 [Kindle 邮箱](docs/kindle.md)\
 🕒 **用量查看** — 查看每日下载配额\
@@ -111,6 +112,8 @@ zlib search "dune" --ext epub --json --count 10
 | 浏览下载历史 | `zlib history` |
 | 查看账号与配额 | `zlib profile` |
 | 配额用尽时轮转账号 | `zlib accounts add`、`zlib accounts switch` |
+| 相关书推荐 | `zlib similar "id:hash"` |
+| 同系列册数 | `zlib series "id:hash"` |
 | 发送到 [Kindle](docs/kindle.md) | `zlib kindle send ./book.epub` |
 
 下载时，将 `id:hash` 替换为结果中书籍的完整 `id`：
@@ -187,6 +190,24 @@ zlib accounts clear                      # 删除全部（当前登录保留）
 - 删除最后一个账号会连 session.json 一起删除（等于完全登出）；
   `accounts clear` 则保留当前登录。
 - 设置了 `ZLIB_DOMAIN` 时，它仍然覆盖所有账号自己的域名。
+
+## 系列与相关书
+
+`zlib similar` 展示 Z-Library 服务端与某本书相关的推荐；`zlib series`
+列出与指定图书同系列的全部已收录图书（含被查询的书本身），按上架顺序
+排序（先册数号，再年份，再书名）。两者都接受与 `download` 相同的书籍
+引用（`id:hash`），输出的表格 ID 列可直接喂给 `zlib download`。
+
+```bash
+zlib similar 13955378:a49630            # 服务端推荐，静态表格
+zlib series 24199554:c524c9             # 整个系列的册数
+zlib series 24199554:c524c9 --json      # {"series": "...", "books": [...]}
+```
+
+推荐结果只带书名和作者——没有年份、格式或大小。系列信息由上传者
+填写，很多书没有；此时 `series` 会明确提示，改用 `similar` 更合适。
+搜索结果的每一条都带 `series` 和 `volume` 字段，任何已有的书都能
+查到同样的数据。
 
 ## 文档
 

@@ -22,6 +22,7 @@ English | [简体中文](README.zh.md)
 
 🔍 **Search** — filter by year, language, and format; sort results\
 📚 **Browse** — favorites, recommendations, popular books, and download history\
+📚 **Series & similar books** — list a book's series volumes or same-topic recommendations
 📥 **Download** — view book details and choose a download directory\
 📖 **Send to Kindle** — deliver files to your [Kindle address](docs/kindle.md)\
 🕒 **Profile** — check your daily download quota\
@@ -114,6 +115,8 @@ zlib search "dune" --ext epub --json --count 10
 | Browse download history | `zlib history` |
 | Check account and quota | `zlib profile` |
 | Rotate accounts on quota exhaustion | `zlib accounts add`, `zlib accounts switch` |
+| Similar books | `zlib similar "id:hash"` |
+| Same-series volumes | `zlib series "id:hash"` |
 | Send to [Kindle](docs/kindle.md) | `zlib kindle send ./book.epub` |
 
 To download, replace `id:hash` with a book's complete `id` from
@@ -197,6 +200,27 @@ Notes:
 - Removing the last remaining account also drops session.json (a full logout);
   `accounts clear` keeps the active login.
 - A set `ZLIB_DOMAIN` still overrides every account's own domain.
+
+## Series and similar books
+
+`zlib similar` shows Z-Library's own recommendations for books related to a
+book; `zlib series` lists every indexed book in the same series as the given
+book — including the queried book itself — ordered for shelf reading (volume,
+then year, then title). Both take the same book reference as `download`
+(`id:hash`) and print a table whose ID column feeds straight into
+`zlib download`.
+
+```bash
+zlib similar 13955378:a49630            # server recommendations, static table
+zlib series 24199554:c524c9             # all volumes of the series
+zlib series 24199554:c524c9 --json      # {"series": "...", "books": [...]}
+```
+
+Recommendations carry only title and author — no year, format, or size.
+Series metadata is filled in by uploaders, so it is missing on many books;
+when it is, `series` says so and `similar` is the better next step. Search
+results include `series` and `volume` fields on every hit, so the same data
+is available for any book you already have.
 
 ## Documentation
 

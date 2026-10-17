@@ -21,6 +21,8 @@ type Book struct {
 	Categories  string   `json:"categories,omitempty"`
 	Edition     string   `json:"edition,omitempty"`
 	Pages       string   `json:"pages,omitempty"`
+	Series      string   `json:"series,omitempty"`
+	Volume      string   `json:"volume,omitempty"`
 	DownloadURL string   `json:"download_url,omitempty"`
 }
 

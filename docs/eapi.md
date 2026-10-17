@@ -45,6 +45,7 @@ zlib login --cookies ./cookies.txt --domain https://z-lib.gd
 | history | 支持 | `GET /eapi/user/book/downloaded` |
 | 已收藏（`favorites`） | 支持 | `GET /eapi/user/book/saved` |
 | 图书详情 | 支持 | `GET /eapi/book/{id}/{hash}` |
+| 相似书推荐 | 支持 | `GET /eapi/book/{id}/{hash}/similar` |
 | 下载链接 | 支持 | `GET /eapi/book/{id}/{hash}/file` |
 | 下载后 Kindle 投递 | 支持 | EAPI 下载后使用本地 SMTP |
 

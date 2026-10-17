@@ -46,6 +46,8 @@ type eapiBook struct {
 	DownloadedAt   string `json:"downloaded_at"`
 	InterestScore  any    `json:"interestScore"`
 	QualityScore   any    `json:"qualityScore"`
+	Series         string `json:"series"`
+	Volume         string `json:"volume"`
 }
 
 type eapiPagination struct {
@@ -271,6 +273,8 @@ func (c *Client) mapEAPIBook(item eapiBook) Book {
 		Categories:  eapiCategoryText(item.Categories),
 		Edition:     eapiString(item.Edition),
 		Pages:       eapiString(item.Pages),
+		Series:      item.Series,
+		Volume:      item.Volume,
 	}
 	if book.Categories == "" {
 		book.Categories = eapiCategoryText(item.Category)
