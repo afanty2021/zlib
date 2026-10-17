@@ -1,6 +1,6 @@
 ---
 name: zlib
-description: Search and download Z-Library books, browse saved books and recommendations, inspect download history or account quota, and diagnose domain connectivity through the zlib CLI. For sending a local file to Kindle, use the bundled kindle skill.
+description: Search and download Z-Library books, browse saved books and recommendations, inspect download history or account quota, and diagnose domain connectivity through the zlib CLI. A photo or screenshot of a book is also a search request: identify the book from the image, then search here instead of the web. For sending a local file to Kindle, use the bundled kindle skill.
 license: MIT
 ---
 
@@ -29,6 +29,25 @@ the non-interactive forms below.
 3. If authentication or connectivity fails, read [connection recovery](references/connection.md).
    Continue when the required command succeeds; a healthy domain alone does not
    establish a valid login.
+
+## A book image is a search request
+
+When the message is (or contains) a photo of a book cover, a book page, or a
+screenshot about a book, treat it as "find this book on Z-Library" — do not
+identify the book via web search:
+
+1. Read title and author off the image — the auto-description in the message
+   usually already carries them; use your vision tool only if it missed them.
+   Publisher/ISBN refine the match but are optional.
+2. Run the normal preflight (binary + login), then
+   `zlib search "<title> <author>" --json --count 10` and relay the results
+   as a markdown table as usual.
+3. Zero hits? Retry with the title alone, then with the title's
+   other-language form if the book is a translation (Chinese ↔ English).
+   Still nothing → say so plainly; only then may you fall back to a web
+   search to check whether the book exists at all.
+4. Web search is for what the user explicitly asks later (reviews, ratings)
+   — never for identifying the cover or finding where to download.
 
 ## Choose the command
 
