@@ -183,10 +183,24 @@ func TestCollectSameSeriesIncludesAnchor(t *testing.T) {
 	}
 }
 
-// An empty result must serialize as "books":[] for jq, never null.
-func TestSeriesJSONViewEmptyIsArray(t *testing.T) {
-	view := seriesJSONView("Discworld", []zlib.Book{})
-	if view.Books == nil {
-		t.Fatal("seriesJSONView() Books = nil, want empty non-nil slice")
+// The empty listing must serialize as "books":[] for jq, never null. The
+// guarantee lives in collectSameSeries's initialisation, so that is what this
+// pins — a view-level test on a hand-made non-nil literal would prove nothing.
+func TestCollectSameSeriesEmptyResultIsNonNil(t *testing.T) {
+	search := fakeSeriesSearch(map[int]zlib.SearchResult{
+		1: {Books: []zlib.Book{
+			{ID: "2", Hash: "bb", Name: "Other series", Series: "Other"},
+		}, TotalPages: 1},
+	})
+
+	books, err := collectSameSeries(search, zlib.Book{}, "Discworld", seriesSearchPages)
+	if err != nil {
+		t.Fatalf("collectSameSeries() error = %v", err)
+	}
+	if books == nil {
+		t.Fatal("collectSameSeries() = nil, want empty non-nil slice so --json prints []")
+	}
+	if len(books) != 0 {
+		t.Fatalf("collectSameSeries() = %+v, want empty", books)
 	}
 }
