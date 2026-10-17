@@ -60,3 +60,6 @@ site/zh/
 
 # Local session handoff notes
 /docs/handoff.md
+
+# ZCode agent session directory
+.zcode/
