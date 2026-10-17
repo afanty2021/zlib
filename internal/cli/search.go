@@ -49,7 +49,9 @@ var searchCmd = &cobra.Command{
 			}
 			deliver := deliveryFlags(cmd)
 
-			return runDownload(newDownloadModel(selectedID, dir, c), deliver, cmd)
+			return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+				return newDownloadModel(selectedID, dir, c)
+			}, deliver, cmd)
 		}
 
 		query := strings.Join(args, " ")

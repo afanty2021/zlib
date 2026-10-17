@@ -25,83 +25,127 @@ var loginCmd = &cobra.Command{
 		password, _ := cmd.Flags().GetString("password")
 		cookieFile, _ := cmd.Flags().GetString("cookies")
 		domain, _ := cmd.Flags().GetString("domain")
-		domain, err := resolveLoginDomain(domain)
-		if err != nil {
-			return err
-		}
-		mode := string(zlib.ClientModeEAPI)
-		if cookieFile != "" {
-			if email != "" || password != "" {
-				return fmt.Errorf("--cookies cannot be combined with --email or --password")
-			}
-			resolved, err := resolveEAPIDomain(cmd.Context(), domain)
-			if err != nil {
-				return err
-			}
-			if resolved != domain {
-				lipgloss.Fprintf(os.Stdout, "%s %s redirects to %s; logging in there.\n", colorCyan(symbolInfo), domain, resolved)
-				domain = resolved
-			}
-			count, err := importCookieSession(cookieFile, domain, time.Now(), mode)
-			if err != nil {
-				return fmt.Errorf("failed to import cookies: %w", err)
-			}
-			lipgloss.Fprintf(os.Stdout, "%s Imported %d cookies.\n", colorGreen(symbolSuccess), count)
-			reportPersistedDomain(cmd.OutOrStdout(), cmd.ErrOrStderr(), domain)
+		session, imported, err := runLoginFlow(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), loginFlowOptions{
+			Email:      email,
+			Password:   password,
+			CookieFile: cookieFile,
+			Domain:     domain,
+		})
+		if errors.Is(err, errLoginCancelled) {
 			return nil
 		}
-		// Decide whether to prompt from the flags, before the remembered email
-		// is filled in. Letting the prefill satisfy the check would make
-		// `zlib login --password X` log into whatever account was remembered,
-		// without ever showing the user which one.
-		promptNeeded := email == "" || password == ""
-		if email == "" {
-			email = rememberedLoginEmail()
-		}
-
-		if promptNeeded {
-			fields, accepted, err := runInlineForm(newInlineForm("Log in", "Log in", []formField{
-				{label: "Email", value: email, hint: "Your Z-Library email address", validate: requiredField("email")},
-				{label: "Password", value: password, secret: true, hint: "Password is not saved", validate: requiredField("password")},
-			}))
-			if err != nil {
-				return err
-			}
-			if !accepted {
-				return nil
-			}
-			email, password = fields[0].value, fields[1].value
-		}
-
-		resolved, err := resolveEAPIDomain(cmd.Context(), domain)
 		if err != nil {
 			return err
 		}
-		if resolved != domain {
-			lipgloss.Fprintf(os.Stdout, "%s %s redirects to %s; logging in there.\n", colorCyan(symbolInfo), domain, resolved)
-			domain = resolved
-		}
-		c := zlib.NewClient()
-		c.SetDomain(domain)
-		if err := c.LoginEAPI(email, password); err != nil {
-			return fmt.Errorf("login failed: %w", err)
-		}
-
-		if err := config.SaveSession(config.Session{
-			Cookies: c.Cookies(),
-			Domain:  c.Domain(),
-			Mode:    mode,
-		}); err != nil {
+		if err := config.SaveSession(session); err != nil {
 			return fmt.Errorf("failed to save session: %w", err)
 		}
-		if err := rememberLoginEmail(email); err != nil {
-			lipgloss.Fprintf(cmd.ErrOrStderr(), "Could not remember login email: %v\n", err)
-		}
 
-		lipgloss.Fprintf(os.Stdout, "%s Logged in successfully.\n", colorGreen(symbolSuccess))
-		reportPersistedDomain(cmd.OutOrStdout(), cmd.ErrOrStderr(), c.Domain())
+		if imported > 0 {
+			lipgloss.Fprintf(os.Stdout, "%s Imported %d cookies.\n", colorGreen(symbolSuccess), imported)
+		} else {
+			lipgloss.Fprintf(os.Stdout, "%s Logged in successfully.\n", colorGreen(symbolSuccess))
+		}
+		reportPersistedDomain(cmd.OutOrStdout(), cmd.ErrOrStderr(), session.Domain)
 		return nil
 	},
+}
+
+// errLoginCancelled reports the user closing the login form without
+// submitting; callers treat it as a silent no-op.
+var errLoginCancelled = errors.New("login cancelled")
+
+// loginFlowOptions carries the credential inputs shared by `zlib login` and
+// `zlib accounts add`.
+type loginFlowOptions struct {
+	Email      string
+	Password   string
+	CookieFile string
+	Domain     string
+}
+
+// runLoginFlow resolves the login domain, follows EAPI redirectors, and runs
+// either the cookie import or the credential login. It returns the session
+// the login produced plus the number of imported cookies (0 for a credential
+// login); persisting that session is the caller's job — plain `zlib login`
+// writes session.json, `zlib accounts add` files it under a named account.
+func runLoginFlow(ctx context.Context, stdout, stderr io.Writer, opts loginFlowOptions) (config.Session, int, error) {
+	domain, err := resolveLoginDomain(opts.Domain)
+	if err != nil {
+		return config.Session{}, 0, err
+	}
+	mode := string(zlib.ClientModeEAPI)
+	if opts.CookieFile != "" {
+		if opts.Email != "" || opts.Password != "" {
+			return config.Session{}, 0, fmt.Errorf("--cookies cannot be combined with --email or --password")
+		}
+		resolved, err := resolveEAPIDomain(ctx, domain)
+		if err != nil {
+			return config.Session{}, 0, err
+		}
+		if resolved != domain {
+			lipgloss.Fprintf(stdout, "%s %s redirects to %s; logging in there.\n", colorCyan(symbolInfo), domain, resolved)
+			domain = resolved
+		}
+		count, err := importCookieSession(opts.CookieFile, domain, time.Now(), mode)
+		if err != nil {
+			return config.Session{}, 0, fmt.Errorf("failed to import cookies: %w", err)
+		}
+		// importCookieSession persists session.json itself; read it back so the
+		// caller has the same session shape a credential login produces.
+		session, err := config.LoadSession()
+		if err != nil {
+			return config.Session{}, 0, fmt.Errorf("imported cookies but could not read them back: %w", err)
+		}
+		return session, count, nil
+	}
+	// Decide whether to prompt from the flags, before the remembered email
+	// is filled in. Letting the prefill satisfy the check would make
+	// `zlib login --password X` log into whatever account was remembered,
+	// without ever showing the user which one.
+	email, password := opts.Email, opts.Password
+	promptNeeded := email == "" || password == ""
+	if email == "" {
+		email = rememberedLoginEmail()
+	}
+
+	if promptNeeded {
+		fields, accepted, err := runInlineForm(newInlineForm("Log in", "Log in", []formField{
+			{label: "Email", value: email, hint: "Your Z-Library email address", validate: requiredField("email")},
+			{label: "Password", value: password, secret: true, hint: "Password is not saved", validate: requiredField("password")},
+		}))
+		if err != nil {
+			return config.Session{}, 0, err
+		}
+		if !accepted {
+			return config.Session{}, 0, errLoginCancelled
+		}
+		email, password = fields[0].value, fields[1].value
+	}
+
+	resolved, err := resolveEAPIDomain(ctx, domain)
+	if err != nil {
+		return config.Session{}, 0, err
+	}
+	if resolved != domain {
+		lipgloss.Fprintf(stdout, "%s %s redirects to %s; logging in there.\n", colorCyan(symbolInfo), domain, resolved)
+		domain = resolved
+	}
+	c := zlib.NewClient()
+	c.SetDomain(domain)
+	if err := c.LoginEAPI(email, password); err != nil {
+		return config.Session{}, 0, fmt.Errorf("login failed: %w", err)
+	}
+
+	if err := rememberLoginEmail(email); err != nil {
+		lipgloss.Fprintf(stderr, "Could not remember login email: %v\n", err)
+	}
+
+	return config.Session{
+		Cookies: c.Cookies(),
+		Domain:  c.Domain(),
+		Mode:    mode,
+	}, 0, nil
 }
 
 // reportPersistedDomain records the domain a login just used as ZLIB_DOMAIN in

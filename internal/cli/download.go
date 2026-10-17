@@ -31,11 +31,9 @@ var downloadCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		c, err := loadClient()
-		if err != nil {
-			return err
-		}
-		return runDownload(newDownloadModel(args[0], dir, c), deliveryFlags(cmd), cmd)
+		return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+			return newDownloadModel(args[0], dir, c)
+		}, deliveryFlags(cmd), cmd)
 	},
 }
 

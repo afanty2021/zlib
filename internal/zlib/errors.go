@@ -32,6 +32,9 @@ var (
 	// ErrMirrorUnverified is returned when a domain offered as a user mirror
 	// does not itself answer as the Z-Library EAPI.
 	ErrMirrorUnverified = errors.New("zlibrary: mirror did not answer as Z-Library")
+	// ErrDailyLimit is returned when the account's daily download quota is
+	// exhausted. The CLI uses it to rotate to another configured account.
+	ErrDailyLimit = errors.New("zlibrary: daily download limit reached")
 )
 
 // BotProtectionError describes an anti-bot response returned by the upstream.
