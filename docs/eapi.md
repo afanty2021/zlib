@@ -47,6 +47,7 @@ would the account password.
 | `history` | Supported | `GET /eapi/user/book/downloaded` |
 | Favorites (`favorites`) | Supported | `GET /eapi/user/book/saved` |
 | Book details | Supported | `GET /eapi/book/{id}/{hash}` |
+| Similar books | Supported | `GET /eapi/book/{id}/{hash}/similar` |
 | Download link | Supported | `GET /eapi/book/{id}/{hash}/file` |
 | Kindle delivery after download | Supported | Local SMTP after the EAPI download |
 
