@@ -30,8 +30,9 @@ var downloadCmd = &cobra.Command{
 			return err
 		}
 		sendToKindle, _ := cmd.Flags().GetBool("send-to-kindle")
-		c := newClient()
-		return runDownload(newDownloadModel(args[0], dir, c), sendToKindle, cmd)
+		return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+			return newDownloadModel(args[0], dir, c)
+		}, sendToKindle, cmd)
 	},
 }
 

@@ -86,6 +86,9 @@ func (c *Client) resolveEAPIFileURL(ctx context.Context, rawURL string) (string,
 		if result.Error == "" {
 			result.Error = "file request was rejected"
 		}
+		if isDailyLimitMessage(result.Error) {
+			return "", fmt.Errorf("%w: %s", ErrDailyLimit, result.Error)
+		}
 		return "", fmt.Errorf("zlibrary: EAPI file request failed: %s", result.Error)
 	}
 	resolved := result.File.DownloadLink
@@ -102,4 +105,11 @@ func (c *Client) resolveEAPIFileURL(ctx context.Context, rawURL string) (string,
 		return "", fmt.Errorf("%w: EAPI returned no file link", ErrDownloadFailed)
 	}
 	return absolutizeURL(c.domain, resolved), nil
+}
+
+// isDailyLimitMessage reports whether an EAPI server error string is the
+// daily-download-quota rejection. Z-Library sends "Daily download limit
+// reached"; match on the lowercased phrase so wording tweaks stay classified.
+func isDailyLimitMessage(msg string) bool {
+	return strings.Contains(strings.ToLower(msg), "daily download limit")
 }

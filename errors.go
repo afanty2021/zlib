@@ -29,6 +29,9 @@ var (
 	// ErrChallengeFailed is returned when the JS challenge could not be cleared
 	// within the client's attempt budget.
 	ErrChallengeFailed = errors.New("zlibrary: could not clear the browser challenge")
+	// ErrDailyLimit is returned when the account's daily download quota is
+	// exhausted. The CLI uses it to rotate to another configured account.
+	ErrDailyLimit = errors.New("zlibrary: daily download limit reached")
 )
 
 // BotProtectionError describes an anti-bot response returned by the upstream.

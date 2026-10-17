@@ -45,20 +45,16 @@ func resolveClientDomain(envDomain, sessionDomain string) string {
 	return strings.TrimSpace(sessionDomain)
 }
 
-// newClient loads session and returns an authenticated client.
-func newClient() *zlib.Client {
-	c, err := loadClient()
-	if err != nil {
-		lipgloss.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	return c
-}
+// errNoSessionCookies marks a session payload without credentials, so
+// callers can keep the familiar "Not logged in" wording for it.
+var errNoSessionCookies = errors.New("no session cookies")
 
-func loadClient() (*zlib.Client, error) {
-	session, err := config.LoadSession()
-	if err != nil || len(session.Cookies) == 0 {
-		return nil, fmt.Errorf("not logged in; use /login or zlib login")
+// clientFromSession builds an authenticated client from an explicit session.
+// It returns errors instead of exiting so account rotation (which swaps
+// sessions mid-command) and tests can react to failures.
+func clientFromSession(session config.Session) (*zlib.Client, error) {
+	if len(session.Cookies) == 0 {
+		return nil, errNoSessionCookies
 	}
 	c := zlib.NewClient()
 	// SetDomain before SetCookies: SetCookies seats the jar against c.domain.
@@ -73,6 +69,24 @@ func loadClient() (*zlib.Client, error) {
 	c.SetDomain(allowedDomain)
 	c.SetCookies(session.Cookies)
 	return c, nil
+}
+
+func loadClient() (*zlib.Client, error) {
+	session, err := config.LoadSession()
+	if err != nil || len(session.Cookies) == 0 {
+		return nil, fmt.Errorf("not logged in; use /login or zlib login")
+	}
+	return clientFromSession(session)
+}
+
+// newClient loads session and returns an authenticated client.
+func newClient() *zlib.Client {
+	c, err := loadClient()
+	if err != nil {
+		lipgloss.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	return c
 }
 
 func Execute() {

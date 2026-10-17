@@ -54,7 +54,9 @@ var historyCmd = &cobra.Command{
 			if bookName == "" {
 				bookName = downloadID
 			}
-			return runDownload(newDirectDownloadModel(bookName, item.DownloadURL, dir, c), sendToKindle, cmd)
+			return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+				return newDirectDownloadModel(bookName, item.DownloadURL, dir, c)
+			}, sendToKindle, cmd)
 		}
 
 		// No flags: interactive mode (--json always forces the static path)
@@ -79,7 +81,9 @@ var historyCmd = &cobra.Command{
 			if bookName == "" {
 				bookName = bookIDFromURL(item.URL)
 			}
-			return runDownload(newDirectDownloadModel(bookName, item.DownloadURL, dir, c), sendToKindle, cmd)
+			return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+				return newDirectDownloadModel(bookName, item.DownloadURL, dir, c)
+			}, sendToKindle, cmd)
 		}
 
 		result, err := c.DownloadHistory(page)

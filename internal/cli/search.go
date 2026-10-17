@@ -43,7 +43,9 @@ var searchCmd = &cobra.Command{
 			}
 			sendToKindle, _ := cmd.Flags().GetBool("send-to-kindle")
 
-			return runDownload(newDownloadModel(selectedID, dir, newClient()), sendToKindle, cmd)
+			return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+				return newDownloadModel(selectedID, dir, c)
+			}, sendToKindle, cmd)
 		}
 
 		query := strings.Join(args, " ")
