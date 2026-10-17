@@ -3,6 +3,8 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -27,10 +29,14 @@ type downloadRotation struct {
 
 // loadDownloadRotation reads accounts.json. A store that cannot be parsed,
 // or that has no accounts left, disables rotation rather than breaking the
-// download.
+// download — with a warning, because silently losing rotation is confusing.
 func loadDownloadRotation() downloadRotation {
 	store, exists, err := config.LoadAccountsOptional()
-	if err != nil || !exists || len(store.Accounts) == 0 {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %s could not be read (%v); falling back to the single-session login.\n", config.AccountsPath(), err)
+		return downloadRotation{}
+	}
+	if !exists || len(store.Accounts) == 0 {
 		return downloadRotation{}
 	}
 	return downloadRotation{store: store, exists: true}
@@ -64,11 +70,21 @@ func usableAccounts(accounts []*config.Account) []*config.Account {
 	return usable
 }
 
+// errCandidatesExhausted is the internal marker that every usable candidate
+// hit its daily limit (or none were usable); run() turns it into one quota
+// refresh pass before reporting.
+var errCandidatesExhausted = errors.New("all candidate accounts exhausted")
+
 // run executes attempt per candidate account. build makes the client for an
 // account; ambient is the client newClient() already built and is used only in
 // single-session mode. Quota bookkeeping and the active-account mirror are
 // persisted as attempts happen, so an interrupted run still leaves an accurate
 // store behind.
+//
+// When every usable candidate hits the daily limit — including the case where
+// an account's cached quota went stale overnight — run re-checks quotas with
+// the server once and retries whatever became usable, bounded to that single
+// extra pass.
 func (r *downloadRotation) run(
 	ambient *zlib.Client,
 	build func(config.Account) (*zlib.Client, error),
@@ -81,17 +97,37 @@ func (r *downloadRotation) run(
 		return attempt(ambient)
 	}
 
-	candidates := usableAccounts(rotationOrder(&r.store))
-	if len(candidates) == 0 {
-		if !r.refreshAll() {
-			return r.exhaustedError()
-		}
-		candidates = usableAccounts(rotationOrder(&r.store))
-		if len(candidates) == 0 {
-			return r.exhaustedError()
-		}
+	if err := r.attemptLoop(build, attempt); err == nil || !errors.Is(err, errCandidatesExhausted) {
+		return err
 	}
 
+	usable, lookupErr := r.refreshAll()
+	if !usable {
+		if lookupErr != nil {
+			return fmt.Errorf("every account reached its daily limit, and the quota re-check failed too (%v); try again later", lookupErr)
+		}
+		return r.exhaustedError()
+	}
+
+	err := r.attemptLoop(build, attempt)
+	if err == nil || !errors.Is(err, errCandidatesExhausted) {
+		return err
+	}
+	return r.exhaustedError()
+}
+
+// attemptLoop tries every usable account once, active first. It returns nil
+// once an attempt succeeds, the aborting error for anything that is not the
+// daily limit, and errCandidatesExhausted when the whole loop was spent
+// hitting limits.
+func (r *downloadRotation) attemptLoop(
+	build func(config.Account) (*zlib.Client, error),
+	attempt func(*zlib.Client) error,
+) error {
+	candidates := usableAccounts(rotationOrder(&r.store))
+	if len(candidates) == 0 {
+		return errCandidatesExhausted
+	}
 	for _, account := range candidates {
 		client, err := build(*account)
 		if err != nil {
@@ -123,7 +159,7 @@ func (r *downloadRotation) run(
 			return err
 		}
 	}
-	return r.exhaustedError()
+	return errCandidatesExhausted
 }
 
 // saveStore writes the account store back after in-place quota edits.
@@ -132,11 +168,17 @@ func (r *downloadRotation) saveStore() error {
 }
 
 // confirmHTMLEDailyLimit double-checks an HTML-mode download failure against
-// the server's quota: only a confirmed zero remaining turns the generic 403
-// into a rotation trigger, and the confirmed quota is cached either way.
-// Anything else keeps the original error.
+// the server's quota: only a confirmed zero remaining turns the failure into
+// a rotation trigger, and the confirmed quota is cached either way. Only the
+// two HTML shapes a daily limit takes are confirmed — a 403 from the file
+// endpoint, or the book page offering no download button at all. Transient
+// 5xx and every other error keep their original error without a quota
+// lookup.
 func (r *downloadRotation) confirmHTMLEDailyLimit(account *config.Account, err error) bool {
-	if !errors.Is(err, zlib.ErrDownloadFailed) {
+	var httpErr *zlib.DownloadHTTPError
+	confirmable := errors.Is(err, zlib.ErrNoDownloadURL) ||
+		(errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusForbidden)
+	if !confirmable {
 		return false
 	}
 	limits, limitsErr := r.fetchLimits(*account)
@@ -161,25 +203,33 @@ func (r *downloadRotation) fetchLimits(account config.Account) (zlib.DownloadLim
 	return client.GetLimits()
 }
 
-// refreshAll re-queries every account's quota and reports whether any account
-// still has downloads left. This is the daily-reset recovery path: the EAPI
+// refreshAll re-queries every account's quota. usable reports whether any
+// account still has downloads left; lookupErr is set when every lookup
+// failed, so callers can tell "confirmed all-exhausted" apart from "the
+// network broke mid-check". This is the daily-reset recovery path: the EAPI
 // does not expose the reset time, so a fresh lookup is the only way to notice
 // the quota came back.
-func (r *downloadRotation) refreshAll() bool {
-	fmt.Printf("%s Every account looks out of quota; re-checking with the server.\n", colorCyanFn(symbolInfo))
-	anyUsable := false
+func (r *downloadRotation) refreshAll() (usable bool, lookupErr error) {
+	fmt.Printf("%s Attempts hit the daily limit everywhere; re-checking quotas with the server.\n", colorCyanFn(symbolInfo))
+	failures := 0
+	var lastErr error
 	for _, account := range rotationOrder(&r.store) {
 		limits, err := r.fetchLimits(*account)
 		if err != nil {
+			failures++
+			lastErr = err
 			continue
 		}
 		account.TouchQuota(limits.DailyRemaining)
 		if !account.Exhausted() {
-			anyUsable = true
+			usable = true
 		}
 	}
 	_ = r.saveStore()
-	return anyUsable
+	if !usable && failures == len(r.store.Accounts) && failures > 0 {
+		lookupErr = lastErr
+	}
+	return usable, lookupErr
 }
 
 // exhaustedError reports the all-accounts-done state with each account's last
