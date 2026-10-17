@@ -91,7 +91,10 @@ var similarCmd = &cobra.Command{
 }
 
 // similarJSONView rewrites IDs into the id:hash form `zlib download` accepts,
-// mirroring what `search --json` does for its rows.
+// mirroring what `search --json` does for its rows. bookCommandID's URL-id
+// fallback is unreachable from SimilarBooks output (entries without a hash
+// are dropped upstream) — kept as defense for a future caller feeding raw
+// Books into the view.
 func similarJSONView(books []zlib.Book) struct {
 	Books []zlib.Book `json:"books"`
 } {
