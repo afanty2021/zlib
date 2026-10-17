@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 )
 
@@ -9,6 +10,12 @@ import (
 // newline and no decoration, so `--json` output is directly consumable by
 // jq, scripts, and the Claude Code plugin.
 func printJSON(v any) error {
-	enc := json.NewEncoder(os.Stdout)
+	return printJSONTo(os.Stdout, v)
+}
+
+// printJSONTo is printJSON aimed at an explicit writer, so commands routed
+// through cobra keep testability instead of writing straight to os.Stdout.
+func printJSONTo(w io.Writer, v any) error {
+	enc := json.NewEncoder(w)
 	return enc.Encode(v)
 }

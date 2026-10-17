@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -119,5 +122,78 @@ func TestAccountsClearKeepsSession(t *testing.T) {
 	}
 	if _, err := config.LoadSession(); err != nil {
 		t.Fatalf("clear keeps session.json: %v", err)
+	}
+}
+
+func TestAccountsListJSONHidesCookies(t *testing.T) {
+	isolateConfigHome(t)
+	store := config.AccountStore{
+		Active: "main",
+		Accounts: []config.Account{
+			{Name: "main", Cookies: map[string]string{"remix_userid": "1", "remix_userkey": "super-secret"}, Domain: "https://zlib.bz", Mode: "eapi"},
+		},
+	}
+	if err := config.SaveAccounts(store); err != nil {
+		t.Fatalf("SaveAccounts() error = %v", err)
+	}
+
+	out, err := runAccountsCLI(t, "accounts", "list", "--json")
+	if err != nil {
+		t.Fatalf("accounts list --json: %v", err)
+	}
+	if strings.Contains(out, "super-secret") || strings.Contains(out, "remix_userkey") || strings.Contains(out, "cookies") {
+		t.Fatalf("JSON output must not carry credentials: %s", out)
+	}
+
+	var view struct {
+		Active   string `json:"active"`
+		Accounts []struct {
+			Name   string `json:"name"`
+			Active bool   `json:"active"`
+			Domain string `json:"domain"`
+			Mode   string `json:"mode"`
+		} `json:"accounts"`
+	}
+	if err := json.Unmarshal([]byte(out), &view); err != nil {
+		t.Fatalf("JSON output is not the sanitized shape: %v (%s)", err, out)
+	}
+	if view.Active != "main" || len(view.Accounts) != 1 || view.Accounts[0].Name != "main" ||
+		!view.Accounts[0].Active || view.Accounts[0].Domain != "https://zlib.bz" || view.Accounts[0].Mode != "eapi" {
+		t.Fatalf("sanitized view = %+v", view)
+	}
+}
+
+func TestLoginWritesThroughToActiveAccount(t *testing.T) {
+	isolateConfigHome(t)
+	seedSession(t, "1")
+	if _, err := runAccountsCLI(t, "accounts", "import", "main"); err != nil {
+		t.Fatalf("accounts import: %v", err)
+	}
+
+	// A fresh login (cookie import flavor: no network needed) must update the
+	// stored credentials of the active account, or rotation would keep
+	// replaying the stale cookies.
+	cookies := "# Netscape HTTP Cookie File\n" +
+		".zlib.bz\tTRUE\t/\tTRUE\t1950000000\tremix_userid\t77\n" +
+		".zlib.bz\tTRUE\t/\tTRUE\t1950000000\tremix_userkey\tfresh-key\n"
+	cookieFile := filepath.Join(t.TempDir(), "cookies.txt")
+	if err := os.WriteFile(cookieFile, []byte(cookies), 0600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	out, err := runAccountsCLI(t, "login", "--cookies", cookieFile, "--domain", "https://zlib.bz")
+	if err != nil {
+		t.Fatalf("login --cookies: %v (out=%s)", err, out)
+	}
+	if !strings.Contains(out, "active account main") {
+		t.Fatalf("login should report the write-through, got: %s", out)
+	}
+
+	store, exists, err := config.LoadAccountsOptional()
+	if err != nil || !exists {
+		t.Fatalf("LoadAccountsOptional() exists=%v err=%v", exists, err)
+	}
+	if a := store.Find("main"); a == nil || a.Cookies["remix_userid"] != "77" || a.Cookies["remix_userkey"] != "fresh-key" {
+		t.Fatalf("active account should carry the fresh cookies, got %+v", store.Find("main"))
 	}
 }

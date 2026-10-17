@@ -114,3 +114,16 @@ func TestResolveEAPIFileURLOtherErrorsStayUnclassified(t *testing.T) {
 		t.Fatalf("resolveEAPIFileURL() error = %v, want non-sentinel error", err)
 	}
 }
+
+func TestFetchBookEAPIClassifiesDailyLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, `{"success":0,"error":"Daily download limit reached"}`)
+	}))
+	defer server.Close()
+
+	_, err := newLoggedInEAPITestClient(server.URL).FetchBook("42:abc123")
+	if !errors.Is(err, ErrDailyLimit) {
+		t.Fatalf("FetchBook() error = %v, want ErrDailyLimit", err)
+	}
+}

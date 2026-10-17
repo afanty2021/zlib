@@ -27,13 +27,5 @@ func LoadSession() (Session, error) {
 }
 
 func SaveSession(s Session) error {
-	path := SessionPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0600)
+	return saveJSONAtomic(SessionPath(), s)
 }

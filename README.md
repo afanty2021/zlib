@@ -188,8 +188,14 @@ fails with an error listing each account's remaining count.
 
 Notes:
 
-- An expired session on one account is not rotated away; remove and re-add
-  that account to re-login it.
+- On the HTML site an exhausted quota often shows up as the book page offering
+  no download button, or the file request answering 403; both are confirmed
+  against the quota page before rotating, so unrelated failures keep their
+  original error.
+- `zlib login` updates the stored credentials of the active account when one
+  is configured — re-login after session expiry with the usual command.
+- Removing the last remaining account also drops session.json (a full logout);
+  `accounts clear` keeps the active login.
 - A set `ZLIB_DOMAIN` still overrides every account's own domain.
 
 ## Documentation

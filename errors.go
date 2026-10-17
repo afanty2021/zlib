@@ -32,6 +32,12 @@ var (
 	// ErrDailyLimit is returned when the account's daily download quota is
 	// exhausted. The CLI uses it to rotate to another configured account.
 	ErrDailyLimit = errors.New("zlibrary: daily download limit reached")
+	// ErrNoDownloadURL is returned when a book page offers no download link.
+	// On the HTML site an exhausted daily quota often presents exactly this
+	// way: the download button is replaced by an "unavailable" marker, so the
+	// CLI treats this error as a rotation candidate pending quota
+	// confirmation.
+	ErrNoDownloadURL = errors.New("zlibrary: no download URL available for this book")
 )
 
 // BotProtectionError describes an anti-bot response returned by the upstream.
@@ -57,4 +63,20 @@ type HTTPStatusError struct {
 
 func (e *HTTPStatusError) Error() string {
 	return fmt.Sprintf("zlibrary: unexpected HTTP status %d at %s", e.StatusCode, e.URL)
+}
+
+// DownloadHTTPError describes a file download rejected with a non-success
+// HTTP status. It unwraps to ErrDownloadFailed so callers can classify it
+// with errors.Is, and carries the status so rotation can gate its quota
+// confirmation on 403 instead of re-checking on every transient 5xx.
+type DownloadHTTPError struct {
+	StatusCode int
+}
+
+func (e *DownloadHTTPError) Error() string {
+	return fmt.Sprintf("%s: HTTP %d", ErrDownloadFailed, e.StatusCode)
+}
+
+func (e *DownloadHTTPError) Unwrap() error {
+	return ErrDownloadFailed
 }

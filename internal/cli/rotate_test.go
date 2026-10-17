@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -276,4 +277,169 @@ func TestAccountFromRemixCredentialsDomainFallback(t *testing.T) {
 			t.Fatal("expected missing --user-key error")
 		}
 	})
+}
+
+func TestRunRecoversStaleExhaustedAccountMidLoop(t *testing.T) {
+	isolateConfigHome(t)
+
+	// a is cached exhausted from last night but its quota actually reset;
+	// b burns out mid-download. The post-loop refresh must revive a and the
+	// retry pass must succeed on it instead of reporting all-exhausted.
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "b",
+			Accounts: []config.Account{accountWithQuota("a", quotaPtr(0)), accountWithQuota("b", nil)},
+		},
+		exists: true,
+		limitsFetch: func(account config.Account) (zlib.DownloadLimit, error) {
+			if account.Name == "a" {
+				return zlib.DownloadLimit{DailyRemaining: 10}, nil
+			}
+			return zlib.DownloadLimit{DailyRemaining: 0}, nil
+		},
+	}
+
+	attempts := 0
+	err := rotation.run(nil,
+		func(account config.Account) (*zlib.Client, error) { return nil, nil },
+		func(c *zlib.Client) error {
+			attempts++
+			if attempts == 1 {
+				return fmt.Errorf("%w: Daily download limit reached", zlib.ErrDailyLimit)
+			}
+			return nil
+		})
+	if err != nil || attempts != 2 {
+		t.Fatalf("run() err=%v attempts=%d, want 2 attempts and success", err, attempts)
+	}
+	if a := rotation.store.Find("a"); a == nil || a.Remaining == nil || *a.Remaining != 9 {
+		t.Fatalf("account a remaining = %v, want 9 after refresh + download", rotation.store.Find("a").Remaining)
+	}
+	if rotation.store.Active != "a" {
+		t.Fatalf("active = %q, want a after the successful retry", rotation.store.Active)
+	}
+}
+
+func TestConfirmHTMLNoDownloadURLRotatesOnConfirmedZero(t *testing.T) {
+	isolateConfigHome(t)
+
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", nil), accountWithQuota("b", nil)},
+		},
+		exists: true,
+		limitsFetch: func(account config.Account) (zlib.DownloadLimit, error) {
+			return zlib.DownloadLimit{DailyRemaining: 0}, nil
+		},
+	}
+
+	attempts := 0
+	err := rotation.run(nil,
+		func(account config.Account) (*zlib.Client, error) { return nil, nil },
+		func(c *zlib.Client) error {
+			attempts++
+			if attempts == 1 {
+				// The HTML shape: quota exhaustion shows up as the book page
+				// offering no download button at all.
+				return fmt.Errorf("%w: 12345", zlib.ErrNoDownloadURL)
+			}
+			return nil
+		})
+	if err != nil || attempts != 2 {
+		t.Fatalf("run() err=%v attempts=%d, want rotation to b and success", err, attempts)
+	}
+	if a := rotation.store.Find("a"); a == nil || !a.Exhausted() {
+		t.Fatal("account a should be marked exhausted after confirmation")
+	}
+}
+
+func TestConfirmHTMLKeepsErrorWhenQuotaRemains(t *testing.T) {
+	isolateConfigHome(t)
+
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", nil), accountWithQuota("b", nil)},
+		},
+		exists: true,
+		limitsFetch: func(account config.Account) (zlib.DownloadLimit, error) {
+			return zlib.DownloadLimit{DailyRemaining: 3}, nil
+		},
+	}
+
+	attempts := 0
+	downloadErr := fmt.Errorf("%w: 12345", zlib.ErrNoDownloadURL)
+	err := rotation.run(nil,
+		func(account config.Account) (*zlib.Client, error) { return nil, nil },
+		func(c *zlib.Client) error {
+			attempts++
+			return downloadErr
+		})
+	if !errors.Is(err, zlib.ErrNoDownloadURL) {
+		t.Fatalf("run() err = %v, want the original no-download-URL error", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want 1 (no rotation with quota left)", attempts)
+	}
+	if a := rotation.store.Find("a"); a == nil || a.Remaining == nil || *a.Remaining != 3 {
+		t.Fatalf("confirmed quota should be cached, got %v", rotation.store.Find("a").Remaining)
+	}
+}
+
+func TestConfirmSkipsQuotaLookupForTransientStatuses(t *testing.T) {
+	isolateConfigHome(t)
+
+	lookups := 0
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", nil), accountWithQuota("b", nil)},
+		},
+		exists: true,
+		limitsFetch: func(account config.Account) (zlib.DownloadLimit, error) {
+			lookups++
+			return zlib.DownloadLimit{DailyRemaining: 0}, nil
+		},
+	}
+
+	gatewayErr := &zlib.DownloadHTTPError{StatusCode: http.StatusServiceUnavailable}
+	err := rotation.run(nil,
+		func(account config.Account) (*zlib.Client, error) { return nil, nil },
+		func(c *zlib.Client) error { return gatewayErr })
+	if !errors.Is(err, zlib.ErrDownloadFailed) {
+		t.Fatalf("run() err = %v, want the original gateway error", err)
+	}
+	if lookups != 0 {
+		t.Fatalf("quota lookups = %d, want 0 for a 503 failure", lookups)
+	}
+}
+
+func TestRunDistinguishesLookupFailureFromExhaustion(t *testing.T) {
+	isolateConfigHome(t)
+
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", quotaPtr(0)), accountWithQuota("b", quotaPtr(0))},
+		},
+		exists: true,
+		limitsFetch: func(account config.Account) (zlib.DownloadLimit, error) {
+			return zlib.DownloadLimit{}, errors.New("connection refused")
+		},
+	}
+
+	attempts := 0
+	err := rotation.run(nil,
+		func(account config.Account) (*zlib.Client, error) { return nil, nil },
+		func(c *zlib.Client) error {
+			attempts++
+			return nil
+		})
+	if err == nil || !strings.Contains(err.Error(), "re-check failed") {
+		t.Fatalf("run() err = %v, want the quota-lookup-failure wording", err)
+	}
+	if attempts != 0 {
+		t.Fatalf("attempts = %d, want 0 (nothing was confirmed usable)", attempts)
+	}
 }

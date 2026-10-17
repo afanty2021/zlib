@@ -120,7 +120,9 @@ var accountsListCmd = &cobra.Command{
 			return fmt.Errorf("failed to load accounts: %w", err)
 		}
 		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
-			return printJSON(store)
+			// Never emit credentials: remix cookies are long-lived secrets,
+			// and --json output is exactly what ends up in CI logs.
+			return printJSONTo(cmd.OutOrStdout(), accountsJSONView(&store))
 		}
 		if !exists || len(store.Accounts) == 0 {
 			fmt.Fprintln(cmd.OutOrStdout(), "No accounts configured. Add one with `zlib accounts add <name>` or `zlib accounts import <name>`.")
@@ -267,6 +269,35 @@ var accountsClearCmd = &cobra.Command{
 		fmt.Fprintf(cmd.OutOrStdout(), "%s Run `zlib logout` to drop that session as well.\n", colorCyanFn(symbolInfo))
 		return nil
 	},
+}
+
+// accountJSONView is the credential-free projection of an account used by
+// `accounts list --json`.
+type accountJSONView struct {
+	Name      string `json:"name"`
+	Active    bool   `json:"active"`
+	Domain    string `json:"domain"`
+	Mode      string `json:"mode,omitempty"`
+	Remaining *int   `json:"remaining,omitempty"`
+	CheckedAt string `json:"checked_at,omitempty"`
+}
+
+// accountsJSONView strips cookies from the store for JSON output; remix
+// cookies are long-lived credentials and JSON output is what gets piped into
+// CI logs and shell history.
+func accountsJSONView(store *config.AccountStore) map[string]any {
+	accounts := make([]accountJSONView, 0, len(store.Accounts))
+	for _, account := range store.Accounts {
+		accounts = append(accounts, accountJSONView{
+			Name:      account.Name,
+			Active:    account.Name == store.Active,
+			Domain:    account.Domain,
+			Mode:      accountModeLabel(account),
+			Remaining: account.Remaining,
+			CheckedAt: account.CheckedAt,
+		})
+	}
+	return map[string]any{"active": store.Active, "accounts": accounts}
 }
 
 // cleanAccountName validates an account name from argv. Names live inside

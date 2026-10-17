@@ -99,7 +99,10 @@ func (m downloadModel) runPlain() (downloadModel, error) {
 			return m, fmt.Errorf("failed to fetch book: %w", err)
 		}
 		if book.DownloadURL == "" {
-			return m, fmt.Errorf("no download URL available for book %s", m.id)
+			// The page's download button was replaced by an "unavailable"
+			// marker — on the HTML site that is the daily limit's most
+			// common shape, so it carries a sentinel rotation can confirm.
+			return m, fmt.Errorf("%w: %s", zlib.ErrNoDownloadURL, m.id)
 		}
 		downloadURL, name = book.DownloadURL, book.Name
 	}
@@ -214,7 +217,7 @@ func (m downloadModel) fetchCmd() tea.Cmd {
 			return errMsg{fmt.Errorf("failed to fetch book: %w", err)}
 		}
 		if book.DownloadURL == "" {
-			return errMsg{fmt.Errorf("no download URL available for book %s", m.id)}
+			return errMsg{fmt.Errorf("%w: %s", zlib.ErrNoDownloadURL, m.id)}
 		}
 		return fetchDoneMsg{book}
 	}

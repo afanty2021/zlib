@@ -57,15 +57,7 @@ func LoadAccountsOptional() (AccountStore, bool, error) {
 }
 
 func SaveAccounts(s AccountStore) error {
-	path := AccountsPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0600)
+	return saveJSONAtomic(AccountsPath(), s)
 }
 
 // Find returns the account with the given name, or nil.

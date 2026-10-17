@@ -40,6 +40,9 @@ var loginCmd = &cobra.Command{
 		if err := config.SaveSession(session); err != nil {
 			return fmt.Errorf("failed to save session: %w", err)
 		}
+		if name, updated := writeThroughLoginToAccount(session); updated {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s Updated the stored credentials of active account %s.\n", colorCyan(symbolInfo), name)
+		}
 
 		if imported > 0 {
 			lipgloss.Fprintf(os.Stdout, "%s Imported %d cookies.\n", colorGreen(symbolSuccess), imported)
@@ -146,6 +149,29 @@ func runLoginFlow(ctx context.Context, stdout, stderr io.Writer, opts loginFlowO
 		Domain:  c.Domain(),
 		Mode:    mode,
 	}, 0, nil
+}
+
+// writeThroughLoginToAccount files a freshly saved session into the active
+// account entry in accounts.json. Without this, a re-login after session
+// expiry would fix session.json while rotation keeps replaying the stale
+// cookies stored for the account — and the next account switch would
+// overwrite the new session with the old credentials.
+func writeThroughLoginToAccount(session config.Session) (string, bool) {
+	store, exists, err := config.LoadAccountsOptional()
+	if err != nil || !exists || store.Active == "" {
+		return "", false
+	}
+	account := store.Find(store.Active)
+	if account == nil {
+		return "", false
+	}
+	// A quota cache measured under the old credentials may not hold for the
+	// new login; drop it so rotation re-measures.
+	*account = config.AccountFromSession(store.Active, session)
+	if err := config.SaveAccounts(store); err != nil {
+		return "", false
+	}
+	return store.Active, true
 }
 
 // reportPersistedDomain records the domain a login just used as ZLIB_DOMAIN in

@@ -104,7 +104,7 @@ func (c *Client) download(ctx context.Context, downloadURL, destDir string, prog
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return DownloadResult{}, fmt.Errorf("%w: HTTP %d", ErrDownloadFailed, resp.StatusCode)
+		return DownloadResult{}, &DownloadHTTPError{StatusCode: resp.StatusCode}
 	}
 
 	filename := sanitizeFilename(filenameFromResponse(resp, downloadURL))
@@ -203,7 +203,7 @@ func (c *Client) openDownload(ctx context.Context, client *http.Client, rawURL s
 		if !isRetryableStatus(resp.StatusCode) {
 			return resp, nil
 		}
-		lastErr = fmt.Errorf("%w: HTTP %d", ErrDownloadFailed, resp.StatusCode)
+		lastErr = &DownloadHTTPError{StatusCode: resp.StatusCode}
 		drainAndClose(resp.Body)
 	}
 	return nil, lastErr
