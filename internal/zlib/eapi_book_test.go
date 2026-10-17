@@ -1,6 +1,8 @@
 package zlib
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -82,5 +84,33 @@ func TestDownloadResolvesEAPIFileLink(t *testing.T) {
 	}
 	if string(data) != "epub-data" || result.Size != int64(len(data)) {
 		t.Errorf("download result = %+v, data = %q", result, data)
+	}
+}
+
+func TestResolveEAPIFileURLClassifiesDailyLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, `{"success":0,"error":"Daily download limit reached"}`)
+	}))
+	defer server.Close()
+
+	c := newLoggedInEAPITestClient(server.URL)
+	_, err := c.resolveEAPIFileURL(context.Background(), server.URL+"/eapi/book/42/abc123/file")
+	if !errors.Is(err, ErrDailyLimit) {
+		t.Fatalf("resolveEAPIFileURL() error = %v, want ErrDailyLimit", err)
+	}
+}
+
+func TestResolveEAPIFileURLOtherErrorsStayUnclassified(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, `{"success":0,"error":"Book not found"}`)
+	}))
+	defer server.Close()
+
+	c := newLoggedInEAPITestClient(server.URL)
+	_, err := c.resolveEAPIFileURL(context.Background(), server.URL+"/eapi/book/42/abc123/file")
+	if err == nil || errors.Is(err, ErrDailyLimit) {
+		t.Fatalf("resolveEAPIFileURL() error = %v, want non-sentinel error", err)
 	}
 }

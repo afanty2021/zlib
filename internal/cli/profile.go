@@ -27,6 +27,7 @@ var profileCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		recordAccountQuota(profile.DownloadLimit)
 
 		if jsonOut {
 			return printJSON(profile)

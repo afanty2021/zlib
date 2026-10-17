@@ -109,13 +109,15 @@ zlib search "dune" --ext epub
 zlib search "dune" --ext epub --json --count 10
 ```
 
-| 操作                            | 命令                           |
-| ------------------------------- | ------------------------------ |
-| 浏览收藏                        | `zlib favorites`               |
-| 浏览推荐                        | `zlib recommended`             |
-| 浏览热门图书                    | `zlib most-popular`            |
-| 浏览下载历史                    | `zlib history`                 |
-| 查看账号与配额                  | `zlib profile`                 |
+| 操作                            | 命令                                        |
+| ------------------------------- | ------------------------------------------- |
+| 浏览收藏                        | `zlib favorites`                            |
+| 浏览推荐                        | `zlib recommended`                          |
+| 浏览热门图书                    | `zlib most-popular`                         |
+| 浏览下载历史                    | `zlib history`                              |
+| 查看账号与配额                  | `zlib profile`                              |
+| 配额用尽时轮转账号              | `zlib accounts add`、`zlib accounts switch` |
+| 发送到 [Kindle](docs/kindle.md) | `zlib kindle send ./book.epub`              |
 | 发送到 [Kindle](docs/kindle.md) | `zlib kindle send ./book.epub` |
 
 下载时，将 `id:hash` 替换为结果中书籍的完整 `id`：
@@ -150,6 +152,7 @@ codex plugin add zlib@zlib
 ```
 
 ### MCP 服务
+ f583884 (feat: add multi-account download rotation)
 
 把 `zlib mcp` 注册为本地 stdio 服务。需已安装 `zlib` 并完成登录：
 
@@ -163,6 +166,41 @@ codex mcp add zlib -- zlib mcp
 
 在 `mcp` 后加 `--read-only` 可禁用下载、删除历史和发送到 Kindle。其他客户端、参数和工具列表见
 [MCP 服务](docs/mcp.md)。
+
+## 多账号轮转
+
+每个 Z-Library 账号有独立的每日下载配额。配置多个账号后，`download`
+（以及所有其他下载路径——搜索回车下载、`history --download`）会自动轮转：
+服务器返回每日限额错误时，CLI 把该账号标记为用尽，换下一个还有额度的
+账号重试。轮转顺序是当前账号优先，其余按存储顺序；每次下载每个账号
+最多尝试一次。
+
+账号保存在 `~/.config/zlib/accounts.json`，当前账号镜像到 `session.json`，
+因此单账号场景的行为与从前完全一致。
+
+```bash
+zlib accounts add main --user-id 123 --user-key abc --domain https://zlib.bz
+zlib accounts add alt                    # 交互式登录，参数与 `zlib login` 相同
+zlib accounts import backup              # 把当前 session.json 的登录收纳为账号
+zlib accounts list                       # 表格，含各账号的缓存配额
+zlib accounts switch backup              # 手动切换
+zlib accounts remove backup              # 删除一个账号
+zlib accounts clear                      # 删除全部（当前登录保留）
+```
+
+`--user-id`/`--user-key` 直接录入 `remix_userid`/`remix_userkey` 凭证对——
+与 Z-Library 桌面端 App 存在其 `config.json` 里的完全相同——不需要发起
+任何网络请求。
+
+配额记账不产生额外 API 调用：下载成功把缓存剩余数减一，限额错误置零；
+所有账号看起来都用尽时，CLI 会向服务器重查一次（跨天配额重置也靠这个
+发现）。`zlib profile` 会顺带刷新当前账号的缓存。所有账号真正用尽时，
+下载报错并列出各账号的剩余数量。
+
+注意：
+
+- 某个账号会话过期不会触发轮转；请 remove 后重新 add 该账号完成重新登录。
+- 设置了 `ZLIB_DOMAIN` 时，它仍然覆盖所有账号自己的域名。
 
 ## 文档
 

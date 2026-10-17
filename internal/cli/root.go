@@ -45,14 +45,16 @@ func resolveClientDomain(envDomain, sessionDomain string) string {
 	return strings.TrimSpace(sessionDomain)
 }
 
-// loadClient builds the authenticated client for a command. It is a variable
-// only so the demo recorder (demo_test.go) can serve fixture data instead.
-var loadClient = loadSessionClient
+// errNoSessionCookies marks a session payload without credentials, so
+// rotation can tell an empty account entry from a real failure.
+var errNoSessionCookies = errors.New("no session cookies")
 
-func loadSessionClient() (*zlib.Client, error) {
-	session, err := config.LoadSession()
-	if err != nil || len(session.Cookies) == 0 {
-		return nil, errNotLoggedIn
+// clientFromSession builds an authenticated client from an explicit session.
+// It returns errors instead of exiting so account rotation (which swaps
+// sessions mid-command) and tests can react to failures.
+func clientFromSession(session config.Session) (*zlib.Client, error) {
+	if len(session.Cookies) == 0 {
+		return nil, errNoSessionCookies
 	}
 	c := zlib.NewClient()
 	// SetDomain before SetCookies: SetCookies seats the jar against c.domain.
@@ -67,6 +69,18 @@ func loadSessionClient() (*zlib.Client, error) {
 	c.SetDomain(allowedDomain)
 	c.SetCookies(session.Cookies)
 	return c, nil
+}
+
+// loadClient builds the authenticated client for a command. It is a variable
+// only so the demo recorder (demo_test.go) can serve fixture data instead.
+var loadClient = loadSessionClient
+
+func loadSessionClient() (*zlib.Client, error) {
+	session, err := config.LoadSession()
+	if err != nil || len(session.Cookies) == 0 {
+		return nil, errNotLoggedIn
+	}
+	return clientFromSession(session)
 }
 
 func Execute() {

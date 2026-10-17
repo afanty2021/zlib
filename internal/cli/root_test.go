@@ -45,15 +45,38 @@ func TestFormatCLIErrorKeepsSMTPCause(t *testing.T) {
 	}
 }
 
+// switchWriter is a permanently-installed root-command writer whose target
+// can be swapped per call. cobra captures the writer for its lazily-built
+// completion command ONCE at the first ExecuteC (completions.go:
+// `out := c.OutOrStdout()`), so per-call SetOut buffers would silently steal
+// the completion tests' output; routing everything through this writer keeps
+// every ExecuteC-based test in control.
+type switchWriter struct {
+	cur io.Writer
+}
+
+func (w *switchWriter) Write(p []byte) (int, error) {
+	if w.cur == nil {
+		return len(p), nil
+	}
+	return w.cur.Write(p)
+}
+
+var rootTestOut = &switchWriter{}
+
+func init() {
+	rootCmd.SetOut(rootTestOut)
+}
+
 func executeRootForTest(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
 	var out, errOut bytes.Buffer
-	rootCmd.SetOut(&out)
+	rootTestOut.cur = &out
 	rootCmd.SetErr(&errOut)
 	rootCmd.SetArgs(args)
 	t.Cleanup(func() {
-		rootCmd.SetOut(os.Stdout)
+		rootTestOut.cur = nil
 		rootCmd.SetErr(os.Stderr)
 		rootCmd.SetArgs(nil)
 	})
