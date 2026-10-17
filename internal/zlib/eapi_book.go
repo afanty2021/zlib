@@ -42,6 +42,9 @@ func (c *Client) fetchBookEAPIContext(ctx context.Context, ref string) (Book, er
 		if result.Error == "" {
 			result.Error = "book request was rejected"
 		}
+		if isDailyLimitMessage(result.Error) {
+			return Book{}, fmt.Errorf("%w: %s", ErrDailyLimit, result.Error)
+		}
 		return Book{}, fmt.Errorf("zlibrary: EAPI book failed: %s", result.Error)
 	}
 	if eapiString(result.Book.ID) == "" {
