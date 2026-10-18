@@ -70,10 +70,16 @@ history; search uses repeatable `--ext` instead. Consult `zlib <command> --help`
 for additional flags. Search results carry `series`/`volume` when the uploader
 provided them.
 
-Parse complete stdout as JSON before selecting fields or limiting rows. Handle
-nonzero exit status as failure and retain the error message. An empty result is
-still JSON: an empty `items` array for history, an empty `books` array or `[]` for
-book lists. Any non-JSON output is an unexpected response, not an empty result.
+Parse complete stdout as JSON before selecting fields or limiting rows; at
+`--count 10` the document is small enough to read directly. Do not pipe through
+an interpreter (`python3 -c`, `node -e`, …): some environments block
+interpreters mid-pipeline, killing the whole command — pick rows by reading
+the JSON, or fall back to `jq`. Handle
+nonzero exit status as failure and retain the error message. Current empty history
+pages print `No download history found on page N.` even with `--json`; treat only
+that message with exit code zero as an empty page. Other non-JSON output is an
+unexpected response, not an empty result.
+>>>>>>> 65eaf3e (docs(skill): tell agents not to pipe zlib JSON through interpreters)
 
 Show a compact table with title, author, year, format and size where present.
 For long recommendation lists, show a useful subset and state the displayed and
