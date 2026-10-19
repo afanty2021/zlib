@@ -50,7 +50,9 @@ var historyCmd = &cobra.Command{
 				return err
 			}
 			if item.DownloadURL == "" {
-				return runDownload(newDownloadModel(historyCommandID(item), dir, c), sendToKindle, cmd)
+				return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+					return newDownloadModel(historyCommandID(item), dir, c)
+				}, dir, sendToKindle, cmd)
 			}
 
 			bookName := item.Name
@@ -78,7 +80,9 @@ var historyCmd = &cobra.Command{
 			}
 			item := hm.selected
 			if item.DownloadURL == "" {
-				return runDownload(newDownloadModel(historyCommandID(*item), dir, c), sendToKindle, cmd)
+				return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+					return newDownloadModel(historyCommandID(*item), dir, c)
+				}, dir, sendToKindle, cmd)
 			}
 			bookName := item.Name
 			if bookName == "" {
