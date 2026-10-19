@@ -38,6 +38,12 @@ var (
 	// CLI treats this error as a rotation candidate pending quota
 	// confirmation.
 	ErrNoDownloadURL = errors.New("zlibrary: no download URL available for this book")
+	// ErrNoFileLink is returned when an EAPI file response claims success but
+	// carries no download link. Measured live, this is how the server presents
+	// an exhausted daily quota as often as the explicit limit message
+	// (success=1, no link, no error), so the CLI treats it as a rotation
+	// candidate pending quota confirmation.
+	ErrNoFileLink = errors.New("EAPI returned no file link")
 )
 
 // BotProtectionError describes an anti-bot response returned by the upstream.

@@ -105,7 +105,7 @@ func (c *Client) resolveEAPIFileURL(ctx context.Context, rawURL string) (string,
 		resolved = result.Link
 	}
 	if resolved == "" {
-		return "", fmt.Errorf("%w: EAPI returned no file link", ErrDownloadFailed)
+		return "", fmt.Errorf("%w: %w", ErrDownloadFailed, ErrNoFileLink)
 	}
 	return absolutizeURL(c.domain, resolved), nil
 }
