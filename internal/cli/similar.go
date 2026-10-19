@@ -15,14 +15,11 @@ var similarCmd = &cobra.Command{
 	Use:   "similar <book-id>",
 	Short: "Show books similar to a book (server recommendations)",
 	Long: "Show Z-Library's own recommendations for books related to a book.\n" +
-		"The book is referenced the same way as `zlib download` (id:hash in EAPI mode).\n" +
+		"The book is referenced the same way as `zlib download` (id:hash).\n" +
 		"Recommendations carry only title and author; feed the ID column to `zlib download`.",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c := newClient()
-		if err := requireEAPIMode(c, "similar"); err != nil {
-			return err
-		}
 
 		books, err := c.SimilarBooks(args[0])
 		if err != nil {
@@ -113,16 +110,4 @@ func init() {
 	similarCmd.Flags().Bool("full-title", false, "Do not truncate book titles in the results table")
 	similarCmd.Flags().Bool("json", false, "Output results as JSON")
 	rootCmd.AddCommand(similarCmd)
-}
-
-// requireEAPIMode rejects the discovery commands when the session runs in HTML
-// mode. Their id:hash references and endpoints only exist under EAPI, and the
-// HTML failure modes are misleading: series would blame a missing-uploader
-// field the HTML parser never reads, and similar would die on ref parsing or
-// an /eapi 404 on an HTML domain.
-func requireEAPIMode(c *zlib.Client, command string) error {
-	if c.Mode() != zlib.ClientModeEAPI {
-		return fmt.Errorf("%s requires an EAPI session; log in again with `zlib login --eapi`", command)
-	}
-	return nil
 }

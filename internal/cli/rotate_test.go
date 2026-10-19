@@ -244,36 +244,31 @@ func TestRecordAccountQuotaUpdatesActiveAccount(t *testing.T) {
 func TestAccountFromRemixCredentialsDomainFallback(t *testing.T) {
 	t.Run("flag wins", func(t *testing.T) {
 		t.Setenv(zlib.EnvDomain, "https://z-lib.gl")
-		account, err := accountFromRemixCredentials("main", "1", "k", "https://zlib.bz", false)
+		account, err := accountFromRemixCredentials("main", "1", "k", "https://zlib.bz")
 		if err != nil || account.Domain != "https://zlib.bz" {
 			t.Fatalf("account = %+v err = %v", account, err)
 		}
 	})
 	t.Run("env fallback", func(t *testing.T) {
 		t.Setenv(zlib.EnvDomain, "https://z-lib.gl")
-		account, err := accountFromRemixCredentials("main", "1", "k", "", false)
+		account, err := accountFromRemixCredentials("main", "1", "k", "")
 		if err != nil || account.Domain != "https://z-lib.gl" {
 			t.Fatalf("account = %+v err = %v", account, err)
 		}
 	})
 	t.Run("eapi default", func(t *testing.T) {
-		account, err := accountFromRemixCredentials("main", "1", "k", "", true)
+		account, err := accountFromRemixCredentials("main", "1", "k", "")
 		if err != nil || account.Domain != zlib.DefaultEAPIDomain || account.Mode != "eapi" {
 			t.Fatalf("account = %+v err = %v", account, err)
 		}
 	})
-	t.Run("html requires domain", func(t *testing.T) {
-		if _, err := accountFromRemixCredentials("main", "1", "k", "", false); err == nil {
-			t.Fatal("expected domain-required error")
-		}
-	})
 	t.Run("rejects disallowed domain", func(t *testing.T) {
-		if _, err := accountFromRemixCredentials("main", "1", "k", "https://evil.example", true); err == nil {
+		if _, err := accountFromRemixCredentials("main", "1", "k", "https://evil.example"); err == nil {
 			t.Fatal("expected allowlist error")
 		}
 	})
 	t.Run("requires both halves", func(t *testing.T) {
-		if _, err := accountFromRemixCredentials("main", "1", "", "https://zlib.bz", true); err == nil {
+		if _, err := accountFromRemixCredentials("main", "1", "", "https://zlib.bz"); err == nil {
 			t.Fatal("expected missing --user-key error")
 		}
 	})

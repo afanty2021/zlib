@@ -22,15 +22,12 @@ var seriesCmd = &cobra.Command{
 	Use:   "series <book-id>",
 	Short: "List the other books in a book's series",
 	Long: "List every indexed book in the same series as the given book\n" +
-		"(referenced the same way as `zlib download`, id:hash in EAPI mode).\n" +
+		"(referenced the same way as `zlib download`, id:hash).\n" +
 		"Series metadata is filled in by uploaders and not present on every book;\n" +
 		"when it is missing, `zlib similar` is the better next step.",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c := newClient()
-		if err := requireEAPIMode(c, "series"); err != nil {
-			return err
-		}
 
 		book, err := c.FetchBook(args[0])
 		if err != nil {
