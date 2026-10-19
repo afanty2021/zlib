@@ -156,8 +156,9 @@ codex plugin add zlib@zlib
 每个 Z-Library 账号有独立的每日下载配额。配置多个账号后，`download`
 （以及所有其他下载路径——搜索回车下载、`history --download`）会自动轮转：
 服务器返回每日限额错误时，CLI 把该账号标记为用尽，换下一个还有额度的
-账号重试。轮转顺序是当前账号优先，其余按存储顺序；每次下载每个账号
-最多尝试一次。
+账号重试。轮转顺序是当前账号优先，其余按存储顺序；每一轮每个账号最多
+尝试一次。所有账号看起来都用尽时，CLI 会向服务器重查一次配额，查到有余
+额就再来一轮（跨天配额重置也是这样发现的）。
 
 账号保存在 `~/.config/zlib/accounts.json`，当前账号镜像到 `session.json`，
 因此单账号场景的行为与从前完全一致。
@@ -208,6 +209,15 @@ zlib series 24199554:c524c9 --json      # {"series": "...", "books": [...]}
 填写，很多书没有；此时 `series` 会明确提示，改用 `similar` 更合适。
 搜索结果的每一条都带 `series` 和 `volume` 字段，任何已有的书都能
 查到同样的数据。
+
+## 域名
+
+Z-Library 镜像变动频繁；`zlib doctor` 探测已知镜像，用 `ZLIB_DOMAIN` 固定
+它报告可用的那一个。除公共镜像外，CLI 也接受桌面端 App 发给捐赠者的个人
+域名层——`librella.fi`、`librella.tw`、`lexlib.fi`、`lexlib.tw`、
+`bookabooki.fi`、`bookabooki.tw`（含子域名）。它们使用与公共域名相同的
+`remix` cookie 认证。完整接受列表和 URL 规则见
+[docs/eapi.md](docs/eapi.md)。
 
 ## 文档
 

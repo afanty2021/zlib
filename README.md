@@ -162,8 +162,10 @@ and `download` (and every other download path — search Enter, `history
 --download`) rotates automatically: when the server rejects a download with
 the daily-limit error, the CLI marks that account exhausted and retries with
 the next account that may still have quota. The rotation order is the active
-account first, then the rest. Every account is tried at most once per
-download.
+account first, then the rest. An account is tried at most once per pass; when
+every account looks spent, the CLI re-checks the quotas with the server once
+and makes a second pass if any quota came back (this is also how the reset
+after midnight is noticed).
 
 Accounts live in `~/.config/zlib/accounts.json`; the active one is mirrored
 into `session.json`, so single-account setups behave exactly as before.
@@ -221,6 +223,16 @@ Series metadata is filled in by uploaders, so it is missing on many books;
 when it is, `series` says so and `similar` is the better next step. Search
 results include `series` and `volume` fields on every hit, so the same data
 is available for any book you already have.
+
+## Domains
+
+Z-Library mirrors change often; `zlib doctor` probes the well-known ones and
+`ZLIB_DOMAIN` pins whichever it reports usable. Beyond the public mirrors the
+CLI accepts the personal domains the desktop app issues to donors —
+`librella.fi`, `librella.tw`, `lexlib.fi`, `lexlib.tw`, `bookabooki.fi`,
+`bookabooki.tw` (subdomains included). They authenticate with the same
+`remix` cookies. The full accepted list and the URL rules live in
+[docs/eapi.md](docs/eapi.md).
 
 ## Documentation
 
