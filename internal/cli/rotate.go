@@ -156,6 +156,9 @@ func (r *downloadRotation) attemptLoop(
 			}
 			continue
 		default:
+			// A cancel (errCancelled) also lands here and propagates for the
+			// CLI's exit code 130: the server never served a file, so the
+			// quota was not spent and the account stays usable.
 			return err
 		}
 	}
@@ -264,11 +267,26 @@ func recordAccountQuota(limits zlib.DownloadLimit) {
 
 // runDownloadWithRotation wraps runDownload with multi-account rotation.
 // model builds the download model for a given client; every download entry
-// point (download, search Enter, history) goes through here.
-func runDownloadWithRotation(model func(*zlib.Client) downloadModel, deliver deliveries, cmd *cobra.Command) error {
+// point (download, search Enter, history) goes through here. dir is the
+// pre-resolution destination (flag, ZLIB_DOWNLOAD_DIR, or empty).
+func runDownloadWithRotation(model func(*zlib.Client) downloadModel, dir string, deliver deliveries, cmd *cobra.Command) error {
 	rotation := loadDownloadRotation()
 	if !rotation.exists {
 		return runDownload(model(newClient()), deliver, cmd)
+	}
+	// Answer the directory picker once, up front, and pin the answer into
+	// --dir: runDownload re-opens the picker on every attempt otherwise, so
+	// an account switch mid-download would make the user choose again.
+	// Pinning also routes a refusal out before any account is tried.
+	dir, proceed, err := chooseDownloadDirectory(cmd, dir)
+	if err != nil {
+		return err
+	}
+	if !proceed {
+		return nil
+	}
+	if err := cmd.Flags().Set("dir", dir); err != nil {
+		return err
 	}
 	return rotation.run(nil, func(account config.Account) (*zlib.Client, error) {
 		return clientFromSession(account.Session())

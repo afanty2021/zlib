@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -33,7 +34,7 @@ var downloadCmd = &cobra.Command{
 		}
 		return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
 			return newDownloadModel(args[0], dir, c)
-		}, deliveryFlags(cmd), cmd)
+		}, dir, deliveryFlags(cmd), cmd)
 	},
 }
 

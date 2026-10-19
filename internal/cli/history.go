@@ -50,7 +50,9 @@ var historyCmd = &cobra.Command{
 				return err
 			}
 			if item.DownloadURL == "" {
-				return runDownload(newDownloadModel(historyCommandID(item), dir, c), deliver, cmd)
+				return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+					return newDownloadModel(historyCommandID(item), dir, c)
+				}, dir, deliver, cmd)
 			}
 
 			bookName := item.Name
@@ -59,7 +61,7 @@ var historyCmd = &cobra.Command{
 			}
 			return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
 				return historyDirectDownload(item, bookName, dir, c)
-			}, deliver, cmd)
+			}, dir, deliver, cmd)
 		}
 
 		// No flags: interactive mode (--json always forces the static path)
@@ -78,7 +80,9 @@ var historyCmd = &cobra.Command{
 			}
 			item := hm.selected
 			if item.DownloadURL == "" {
-				return runDownload(newDownloadModel(historyCommandID(*item), dir, c), deliver, cmd)
+				return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+					return newDownloadModel(historyCommandID(*item), dir, c)
+				}, dir, deliver, cmd)
 			}
 			bookName := item.Name
 			if bookName == "" {
@@ -86,7 +90,7 @@ var historyCmd = &cobra.Command{
 			}
 			return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
 				return historyDirectDownload(*item, bookName, dir, c)
-			}, deliver, cmd)
+			}, dir, deliver, cmd)
 		}
 
 		result, err := loadHistoryPage(cmd.Context(), c, page, formatFilter)
