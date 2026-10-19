@@ -33,6 +33,10 @@ var seriesCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		// Missing series metadata is a precondition failure, not an empty
+		// result: an empty listing has no series name to render, and the
+		// error is itself the fallback signal steering callers to
+		// `zlib similar` — under --json too, by design.
 		series := strings.TrimSpace(book.Series)
 		if series == "" {
 			return fmt.Errorf("this book has no series recorded (the uploader did not fill it in); try `zlib similar %s` for same-topic recommendations", args[0])
