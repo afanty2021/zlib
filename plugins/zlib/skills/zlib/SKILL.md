@@ -103,6 +103,16 @@ When the user asks only to search or browse, present results. When they request 
 download, proceed with a clear match; ask for a selection when editions or formats
 remain ambiguous. Reuse choices already made in the conversation.
 
+**Check the local library before downloading.** `zlib download` never inspects
+the destination: a file with the same name is silently overwritten. Before
+downloading, look for the book in the user's local library — search file names
+by title and author in the destination folder and in any other folder the user
+keeps books in; if the user maintains a library inventory or catalog file, grep
+that first, since it also covers books stored outside the download directory.
+If the same edition is already local, do not re-download — say where it is.
+Different volumes of a series and different editions of one title are not
+duplicates. An explicit user request to download again overrides this check.
+
 Copy the selected result's full JSON `id`, normally `numeric-id:hash`. Preserve
 both parts exactly; do not invent a reference or replace it with a short legacy ID.
 Replace the placeholder below with the actual result:
