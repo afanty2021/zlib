@@ -438,3 +438,66 @@ func TestRunDistinguishesLookupFailureFromExhaustion(t *testing.T) {
 		t.Fatalf("attempts = %d, want 0 (nothing was confirmed usable)", attempts)
 	}
 }
+
+func TestConfirmEAPINoFileLinkRotatesOnConfirmedZero(t *testing.T) {
+	isolateConfigHome(t)
+
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", nil), accountWithQuota("b", nil)},
+		},
+		exists: true,
+		limitsFetch: func(account config.Account) (zlib.DownloadLimit, error) {
+			return zlib.DownloadLimit{DailyRemaining: 0}, nil
+		},
+	}
+
+	attempts := 0
+	err := rotation.run(nil,
+		func(account config.Account) (*zlib.Client, error) { return nil, nil },
+		func(c *zlib.Client) error {
+			attempts++
+			if attempts == 1 {
+				// The EAPI shape measured live: success=1 with no download
+				// link and no error string when the daily quota is spent.
+				return fmt.Errorf("%w: %w", zlib.ErrDownloadFailed, zlib.ErrNoFileLink)
+			}
+			return nil
+		})
+	if err != nil || attempts != 2 {
+		t.Fatalf("run() err=%v attempts=%d, want rotation to b and success", err, attempts)
+	}
+	if a := rotation.store.Find("a"); a == nil || !a.Exhausted() {
+		t.Fatal("account a should be marked exhausted after confirmation")
+	}
+}
+
+func TestConfirmEAPINoFileLinkKeepsErrorWhenQuotaRemains(t *testing.T) {
+	isolateConfigHome(t)
+
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", nil), accountWithQuota("b", nil)},
+		},
+		exists: true,
+		limitsFetch: func(account config.Account) (zlib.DownloadLimit, error) {
+			return zlib.DownloadLimit{DailyRemaining: 4}, nil
+		},
+	}
+
+	attempts := 0
+	err := rotation.run(nil,
+		func(account config.Account) (*zlib.Client, error) { return nil, nil },
+		func(c *zlib.Client) error {
+			attempts++
+			return fmt.Errorf("%w: %w", zlib.ErrDownloadFailed, zlib.ErrNoFileLink)
+		})
+	if err == nil || attempts != 1 {
+		t.Fatalf("run() err=%v attempts=%d, want the no-link error kept, no rotation", err, attempts)
+	}
+	if a := rotation.store.Find("a"); a == nil || a.Exhausted() {
+		t.Fatal("account a must not be marked exhausted while quota remains")
+	}
+}

@@ -147,7 +147,7 @@ func (r *downloadRotation) attemptLoop(
 				return err
 			}
 			return nil
-		case errors.Is(err, zlib.ErrDailyLimit) || r.confirmHTMLEDailyLimit(account, err):
+		case errors.Is(err, zlib.ErrDailyLimit) || r.confirmDailyLimit(account, err):
 			fmt.Printf("%s Account %s reached its daily limit; trying the next account.\n",
 				colorCyanFn(symbolInfo), account.Name)
 			account.MarkExhausted()
@@ -167,16 +167,15 @@ func (r *downloadRotation) saveStore() error {
 	return config.SaveAccounts(r.store)
 }
 
-// confirmHTMLEDailyLimit double-checks an HTML-mode download failure against
-// the server's quota: only a confirmed zero remaining turns the failure into
-// a rotation trigger, and the confirmed quota is cached either way. Only the
-// two HTML shapes a daily limit takes are confirmed — a 403 from the file
-// endpoint, or the book page offering no download button at all. Transient
-// 5xx and every other error keep their original error without a quota
-// lookup.
-func (r *downloadRotation) confirmHTMLEDailyLimit(account *config.Account, err error) bool {
+// confirmDailyLimit re-checks the account's quota when a download failed in
+// a way the server uses for both "quota gone" and unrelated problems: HTML
+// pages drop the download link or answer 403, and the EAPI answers success
+// with no file link. Only a zero remaining count turns the failure into a
+// rotation trigger; otherwise the original error stands.
+func (r *downloadRotation) confirmDailyLimit(account *config.Account, err error) bool {
 	var httpErr *zlib.DownloadHTTPError
 	confirmable := errors.Is(err, zlib.ErrNoDownloadURL) ||
+		errors.Is(err, zlib.ErrNoFileLink) ||
 		(errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusForbidden)
 	if !confirmable {
 		return false
