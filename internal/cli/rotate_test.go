@@ -501,3 +501,34 @@ func TestConfirmEAPINoFileLinkKeepsErrorWhenQuotaRemains(t *testing.T) {
 		t.Fatal("account a must not be marked exhausted while quota remains")
 	}
 }
+
+func TestCancelledDownloadKeepsAccountUsable(t *testing.T) {
+	isolateConfigHome(t)
+
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", ptrInt(3)), accountWithQuota("b", ptrInt(9))},
+		},
+		exists: true,
+	}
+
+	attempts := 0
+	err := rotation.run(nil,
+		func(account config.Account) (*zlib.Client, error) { return nil, nil },
+		func(c *zlib.Client) error {
+			attempts++
+			return errDownloadCancelled
+		})
+	if err != nil || attempts != 1 {
+		t.Fatalf("run() err=%v attempts=%d, want a clean stop after one attempt", err, attempts)
+	}
+	if a := rotation.store.Find("a"); a == nil || a.Remaining == nil || *a.Remaining != 3 {
+		t.Fatalf("account a remaining = %v, want the 3 it started with", a.Remaining)
+	}
+	if rotation.store.Active != "a" {
+		t.Fatalf("active = %q, want a; a cancel must not switch accounts", rotation.store.Active)
+	}
+}
+
+func ptrInt(v int) *int { return &v }

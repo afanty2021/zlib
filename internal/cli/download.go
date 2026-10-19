@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -32,9 +33,14 @@ var downloadCmd = &cobra.Command{
 		sendToKindle, _ := cmd.Flags().GetBool("send-to-kindle")
 		return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
 			return newDownloadModel(args[0], dir, c)
-		}, sendToKindle, cmd)
+		}, dir, sendToKindle, cmd)
 	},
 }
+
+// errDownloadCancelled reports the user aborting a download after it started
+// (Esc/Ctrl+C on the progress UI). Nothing was saved; rotation treats it as a
+// clean stop that neither spends quota nor switches accounts.
+var errDownloadCancelled = errors.New("download cancelled")
 
 // runDownload executes the download described by m — through the bubbletea
 // progress UI on an interactive terminal, or a plain text path otherwise (see
@@ -54,7 +60,7 @@ func runDownload(m downloadModel, sendToKindle bool, cmd *cobra.Command) error {
 		return err
 	}
 	if dm.state == stateCancelled {
-		return nil
+		return errDownloadCancelled
 	}
 	if dm.err != nil {
 		return dm.err
