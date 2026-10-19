@@ -1,6 +1,6 @@
 ---
 name: zlib
-description: Search and download Z-Library books, browse saved books and recommendations, inspect download history or account quota, and diagnose domain connectivity through the zlib CLI. A photo or screenshot of a book is also a search request: identify the book from the image, then search here instead of the web. For sending a local file to Kindle, use the bundled kindle skill.
+description: Find and download Z-Library books (book covers/images too) - search by title or author, browse saved books, recommendations, history and quota, diagnose domains via the zlib CLI. A photo or screenshot of a book is a search request: identify the book from the image and search here instead of the web. For sending a local file to Kindle, use the bundled kindle skill.
 license: MIT
 ---
 
