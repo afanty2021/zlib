@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	zlib "github.com/heartleo/zlib"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 )
 
 func fakeSeriesSearch(pages map[int]zlib.SearchResult) searchPageFunc {

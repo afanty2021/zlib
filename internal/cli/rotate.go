@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 // downloadRotation drives a download across the configured accounts: it tries
@@ -76,7 +76,7 @@ func usableAccounts(accounts []*config.Account) []*config.Account {
 var errCandidatesExhausted = errors.New("all candidate accounts exhausted")
 
 // run executes attempt per candidate account. build makes the client for an
-// account; ambient is the client newClient() already built and is used only in
+// account; ambient is the client loadClient() already built and is used only in
 // single-session mode. Quota bookkeeping and the active-account mirror are
 // persisted as attempts happen, so an interrupted run still leaves an accurate
 // store behind.
@@ -272,7 +272,11 @@ func recordAccountQuota(limits zlib.DownloadLimit) {
 func runDownloadWithRotation(model func(*zlib.Client) downloadModel, dir string, sendToKindle bool, cmd *cobra.Command) error {
 	rotation := loadDownloadRotation()
 	if !rotation.exists {
-		return runDownload(model(newClient()), sendToKindle, cmd)
+		c, err := loadClient()
+		if err != nil {
+			return err
+		}
+		return runDownload(model(c), sendToKindle, cmd)
 	}
 	// Answer the directory picker once, up front, and pin the answer into
 	// --dir: runDownload re-opens the picker on every attempt otherwise, so
