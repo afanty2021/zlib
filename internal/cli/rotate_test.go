@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/heartleo/zlib"
 	"github.com/heartleo/zlib/internal/config"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 func accountWithQuota(name string, remaining *int) config.Account {

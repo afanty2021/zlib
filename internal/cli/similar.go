@@ -6,7 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
-	zlib "github.com/heartleo/zlib"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +19,10 @@ var similarCmd = &cobra.Command{
 		"Recommendations carry only title and author; feed the ID column to `zlib download`.",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := newClient()
+		c, err := loadClient()
+		if err != nil {
+			return err
+		}
 
 		books, err := c.SimilarBooks(args[0])
 		if err != nil {

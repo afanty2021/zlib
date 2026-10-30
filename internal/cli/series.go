@@ -8,7 +8,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
-	zlib "github.com/heartleo/zlib"
+	zlib "github.com/heartleo/zlib/internal/zlib"
 	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +27,10 @@ var seriesCmd = &cobra.Command{
 		"when it is missing, `zlib similar` is the better next step.",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := newClient()
+		c, err := loadClient()
+		if err != nil {
+			return err
+		}
 
 		book, err := c.FetchBook(args[0])
 		if err != nil {
