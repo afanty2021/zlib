@@ -231,11 +231,15 @@ zlib series 24199554:c524c9 --json      # {"series": "...", "books": [...]}
 ## 域名
 
 Z-Library 镜像变动频繁；`zlib doctor` 探测已知镜像，用 `ZLIB_DOMAIN` 固定
-它报告可用的那一个。除公共镜像外，CLI 也接受桌面端 App 发给捐赠者的个人
-域名层——`librella.fi`、`librella.tw`、`lexlib.fi`、`lexlib.tw`、
-`bookabooki.fi`、`bookabooki.tw`（含子域名）。它们使用与公共域名相同的
-`remix` cookie 认证。完整接受列表和 URL 规则见
-[docs/eapi.md](docs/eapi.md)。
+它报告可用的那一个。CLI 不认识的镜像——比如桌面端 App 发给你的个人域名
+——可以先做 EAPI 验证、再按主机逐个添加：
+
+```sh
+zlib mirrors add librella.fi
+```
+
+信任模型与 TUI 等价操作见
+[Your own mirrors](docs/configuration.md#your-own-mirrors)。
 
 ## 文档
 
