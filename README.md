@@ -249,12 +249,16 @@ is available for any book you already have.
 ## Domains
 
 Z-Library mirrors change often; `zlib doctor` probes the well-known ones and
-`ZLIB_DOMAIN` pins whichever it reports usable. Beyond the public mirrors the
-CLI accepts the personal domains the desktop app issues to donors —
-`librella.fi`, `librella.tw`, `lexlib.fi`, `lexlib.tw`, `bookabooki.fi`,
-`bookabooki.tw` (subdomains included). They authenticate with the same
-`remix` cookies. The full accepted list and the URL rules live in
-[docs/eapi.md](docs/eapi.md).
+`ZLIB_DOMAIN` pins whichever it reports usable. A mirror the CLI does not know
+— for example a personal domain the desktop app issued to you — can be added
+per host after an EAPI check:
+
+```sh
+zlib mirrors add librella.fi
+```
+
+See [Your own mirrors](docs/configuration.md#your-own-mirrors) for the trust
+model and the TUI equivalent.
 
 ## Documentation
 
