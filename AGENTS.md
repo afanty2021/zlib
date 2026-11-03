@@ -14,7 +14,7 @@ remove it from history, forks or tags.
 
 | Layer | What it catches | Where |
 | --- | --- | --- |
-| `node scripts/check-docs.mjs` | Local paths, the current OS username, emails, private IPs and credential values in every Markdown, skill, tape and example file (plus `docs/handoff.md` and `CLAUDE.md`); non-English text in `docs/` | `scripts/check.sh`, CI |
+| `node scripts/check-docs.mjs` | Local paths, the current OS username, emails, private IPs, credential values and merge-conflict markers in every Markdown, skill, tape and example file (plus `docs/handoff.md` and `CLAUDE.md`); non-English text in `docs/` | `scripts/check.sh`, CI |
 | gitleaks with `.gitleaks.toml` | Built-in secret rules, plus `remix_userkey` values and paths into a real home directory, in every file type | `scripts/check.sh` (staged), `gitleaks.yml` (pushes, PRs, weekly full history) |
 | GitHub secret scanning and push protection | Provider tokens, server side | Repository settings |
 | Review | Names in prose, screenshots, GIF and PNG content | You, before every commit |

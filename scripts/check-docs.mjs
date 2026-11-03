@@ -2,7 +2,8 @@
 // Markdown file, skill, tape and example, plus local notes that get shared
 // (docs/handoff.md, CLAUDE.md). None may leak the author's machine: absolute
 // local paths, the current OS username, personal email addresses, private IP
-// addresses or credential values. Documents under docs/ must also be English.
+// addresses or credential values. Committed merge-conflict markers are
+// rejected too. Documents under docs/ must also be English.
 // gitleaks (.gitleaks.toml) covers secrets in every file type; this check
 // covers what secret scanners do not.
 // Rules: AGENTS.md#documentation-privacy. Runs from scripts/check.sh and CI.
@@ -64,6 +65,14 @@ const rules = [
   {
     name: 'credential value',
     find: line => [...line.matchAll(/remix[_-]user(?:id|key)["']?\s*[:=]\s*["']?(?![<$])[\w-]{6,}/gi)].map(m => m[0]),
+  },
+  {
+    // Git's line-start conflict markers are plain text in these file types,
+    // so nothing else fails on them. `=======` bare only: it is the one form
+    // a Markdown setext underline could mimic, and git always writes it bare.
+    name: 'merge conflict marker',
+    find: line =>
+      /^(?:<{7}|\|{7}|>{7})(?: .*)?$/.test(line) || /^={7}$/.test(line) ? [line.trim()] : [],
   },
 ];
 
