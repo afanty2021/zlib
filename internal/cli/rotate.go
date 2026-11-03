@@ -265,10 +265,16 @@ func recordAccountQuota(limits zlib.DownloadLimit) {
 	_ = config.SaveAccounts(store)
 }
 
+// pickDownloadDirectory answers the interactive directory chooser for
+// runDownloadWithRotation; tests replace it to simulate a TTY choice.
+var pickDownloadDirectory = chooseDownloadDirectory
+
 // runDownloadWithRotation wraps runDownload with multi-account rotation.
-// model builds the download model for a given client; every download entry
-// point (download, search Enter, history) goes through here. dir is the
-// pre-resolution destination (flag, ZLIB_DOWNLOAD_DIR, or empty).
+// model builds the download model for a given client; every CLI download
+// entry point (download, search Enter, history, favorites and the book feeds)
+// goes through here — the interactive TUI and the MCP server call runDownload
+// directly. dir is the pre-resolution destination (flag, ZLIB_DOWNLOAD_DIR,
+// or empty).
 func runDownloadWithRotation(model func(*zlib.Client) downloadModel, dir string, sendToKindle bool, cmd *cobra.Command) error {
 	rotation := loadDownloadRotation()
 	if !rotation.exists {
@@ -278,23 +284,38 @@ func runDownloadWithRotation(model func(*zlib.Client) downloadModel, dir string,
 		}
 		return runDownload(model(c), sendToKindle, cmd)
 	}
-	// Answer the directory picker once, up front, and pin the answer into
-	// --dir: runDownload re-opens the picker on every attempt otherwise, so
-	// an account switch mid-download would make the user choose again.
-	// Pinning also routes a refusal out before any account is tried.
-	dir, proceed, err := chooseDownloadDirectory(cmd, dir)
-	if err != nil {
-		return err
-	}
-	if !proceed {
-		return nil
-	}
-	if err := cmd.Flags().Set("dir", dir); err != nil {
-		return err
+	// Answer the directory picker once, up front: runDownload re-opens the
+	// picker on each attempt otherwise, so an account switch mid-download
+	// would make the user choose again. Answering up front also routes a
+	// refusal out before any account is tried. --json must not open the
+	// picker at all — stdout carries the result document (runDownload skips
+	// the picker for the same reason).
+	jsonOut := jsonRequested(cmd)
+	if !jsonOut {
+		picked, proceed, err := pickDownloadDirectory(cmd, dir)
+		if err != nil {
+			return err
+		}
+		if !proceed {
+			return errCancelled
+		}
+		dir = picked
+		// Pin the answer into --dir so runDownload's own
+		// chooseDownloadDirectory becomes a no-op (a Changed flag returns the
+		// model dir untouched).
+		if err := cmd.Flags().Set("dir", dir); err != nil {
+			return err
+		}
 	}
 	return rotation.run(nil, func(account config.Account) (*zlib.Client, error) {
 		return clientFromSession(account.Session())
 	}, func(c *zlib.Client) error {
-		return runDownload(model(c), sendToKindle, cmd)
+		m := model(c)
+		if !jsonOut {
+			// The command-layer closures captured the pre-picker dir, so the
+			// answer has to be re-applied to every attempt's model.
+			m.dir = dir
+		}
+		return runDownload(m, sendToKindle, cmd)
 	})
 }

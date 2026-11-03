@@ -52,7 +52,9 @@ func newBookFeedCommand(name, description, summary string, load func(*zlib.Clien
 					return err
 				}
 				sendToKindle, _ := cmd.Flags().GetBool("send-to-kindle")
-				return runDownload(newDownloadModel(selected.selectedID, dir, c), sendToKindle, cmd)
+				return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+					return newDownloadModel(selected.selectedID, dir, c)
+				}, dir, sendToKindle, cmd)
 			}
 
 			books, err := fetch()
