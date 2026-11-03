@@ -52,7 +52,9 @@ func newBookFeedCommand(name, description, summary string, load func(*zlib.Clien
 					return err
 				}
 				deliver := deliveryFlags(cmd)
-				return runDownload(newDownloadModel(selected.selectedID, dir, c), deliver, cmd)
+				return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+					return newDownloadModel(selected.selectedID, dir, c)
+				}, dir, deliver, cmd)
 			}
 
 			books, err := fetch()

@@ -5,6 +5,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
+
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 var favoritesCmd = newSavedBooksCommand("favorites")
@@ -47,7 +49,9 @@ func runSavedBooks(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		deliver := deliveryFlags(cmd)
-		return runDownload(newDownloadModel(selected.selectedID, dir, c), deliver, cmd)
+		return runDownloadWithRotation(func(c *zlib.Client) downloadModel {
+			return newDownloadModel(selected.selectedID, dir, c)
+		}, dir, deliver, cmd)
 	}
 
 	page, _ := cmd.Flags().GetInt("page")

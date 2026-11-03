@@ -71,6 +71,16 @@ type kindleResult struct {
 	Error string `json:"error,omitempty"`
 }
 
+// jsonRequested reports whether the command was invoked with --json; commands
+// without the flag never request JSON output.
+func jsonRequested(cmd *cobra.Command) bool {
+	if cmd.Flags().Lookup("json") == nil {
+		return false
+	}
+	jsonOut, _ := cmd.Flags().GetBool("json")
+	return jsonOut
+}
+
 // runDownload executes the download described by m — through the bubbletea
 // progress UI on an interactive terminal, or a plain path otherwise (see
 // isInteractive) — then reports the saved file and optionally delivers it to
@@ -78,10 +88,7 @@ type kindleResult struct {
 // feed commands. With --json the plain path always runs, progress goes to
 // stderr, and stdout carries only the downloadResult document.
 func runDownload(m downloadModel, deliver deliveries, cmd *cobra.Command) error {
-	jsonOut := false
-	if cmd.Flags().Lookup("json") != nil {
-		jsonOut, _ = cmd.Flags().GetBool("json")
-	}
+	jsonOut := jsonRequested(cmd)
 	if !jsonOut {
 		dir, proceed, err := chooseDownloadDirectory(cmd, m.dir)
 		if err != nil {
