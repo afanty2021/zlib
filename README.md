@@ -121,7 +121,6 @@ zlib search "dune" --ext epub --json --count 10
 | Browse download history             | `zlib history`                              |
 | Check account and quota             | `zlib profile`                              |
 | Rotate accounts on quota exhaustion | `zlib accounts add`, `zlib accounts switch` |
-| Rotate accounts on quota exhaustion | `zlib accounts add`, `zlib accounts switch` |
 | Similar books                       | `zlib similar "id:hash"`                    |
 | Same-series volumes                 | `zlib series "id:hash"`                     |
 | Send to [Kindle](docs/kindle.md)    | `zlib kindle send ./book.epub`              |
@@ -179,9 +178,10 @@ delivery. See [MCP server](docs/mcp.md) for other clients, flags, and tools.
 ## Multi-account rotation
 
 Each Z-Library account gets its own daily download quota. Configure several
-and `download` (and every other download path — search Enter, `history
---download`) rotates automatically: when the server rejects a download with
-the daily-limit error, the CLI marks that account exhausted and retries with
+and `download` (and the other CLI download paths — search Enter, `history
+--download`, favorites and the book feeds) rotates automatically: when the
+server rejects a download with the daily-limit error, the CLI marks that
+account exhausted and retries with
 the next account that may still have quota. The rotation order is the active
 account first, then the rest. An account is tried at most once per pass; when
 every account looks spent, the CLI re-checks the quotas with the server once
@@ -222,6 +222,8 @@ Notes:
   is configured — re-login after session expiry with the usual command.
 - Removing the last remaining account also drops session.json (a full logout);
   `accounts clear` keeps the active login.
+- The interactive TUI and the MCP server download with the active account
+  only; rotation covers the CLI commands above.
 - A set `ZLIB_DOMAIN` still overrides every account's own domain.
 
 ## Series and similar books
