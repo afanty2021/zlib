@@ -181,9 +181,8 @@ func TestLoginWritesThroughToActiveAccount(t *testing.T) {
 		t.Fatalf("accounts import: %v", err)
 	}
 
-	// A fresh login (cookie import flavor: no network needed) must update the
-	// stored credentials of the active account, or rotation would keep
-	// replaying the stale cookies.
+	// A fresh cookie login must update the stored credentials of the active
+	// account, or rotation would keep replaying the stale cookies.
 	cookies := "# Netscape HTTP Cookie File\n" +
 		".zlib.bz\tTRUE\t/\tTRUE\t1950000000\tremix_userid\t77\n" +
 		".zlib.bz\tTRUE\t/\tTRUE\t1950000000\tremix_userkey\tfresh-key\n"

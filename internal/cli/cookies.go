@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/heartleo/zlib/internal/config"
 	"github.com/heartleo/zlib/internal/zlib"
 )
 
@@ -158,22 +157,4 @@ func parseCookieSession(cookieFile, domain string, now time.Time) (map[string]st
 		}
 	}
 	return cookies, domain, nil
-}
-
-// importCookieSession parses a cookie file and persists it as the current
-// session. Login flows that file the result into the account store call
-// parseCookieSession instead, so the store can be written first.
-func importCookieSession(cookieFile, domain string, now time.Time, modes ...string) (int, error) {
-	cookies, domain, err := parseCookieSession(cookieFile, domain, now)
-	if err != nil {
-		return 0, err
-	}
-	mode := ""
-	if len(modes) > 0 {
-		mode = modes[0]
-	}
-	if err := config.SaveSession(config.Session{Cookies: cookies, Domain: domain, Mode: mode}); err != nil {
-		return 0, fmt.Errorf("save imported session: %w", err)
-	}
-	return len(cookies), nil
 }

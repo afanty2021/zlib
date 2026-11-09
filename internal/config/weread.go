@@ -87,6 +87,12 @@ func saveWeRead(creds weread.Credentials) error {
 		tmp.Close()
 		return err
 	}
+	// Same durability rule as saveJSONAtomic: flush to disk before the
+	// rename, or a crash right after it can leave an empty credentials file.
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}

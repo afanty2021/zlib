@@ -580,6 +580,12 @@ func TestRunDistinguishesLookupFailureFromExhaustion(t *testing.T) {
 	if attempts != 0 {
 		t.Fatalf("attempts = %d, want 0 (nothing was confirmed usable)", attempts)
 	}
+	// The re-check-failure variant still carries the exhaustion sentinel —
+	// no caller can retry its way out of it — while the wording above keeps
+	// the network detail visible.
+	if !errors.Is(err, errAllAccountsExhausted) {
+		t.Fatalf("run() err = %v, want it to unwrap to errAllAccountsExhausted", err)
+	}
 }
 
 func TestConfirmEAPINoFileLinkRotatesOnConfirmedZero(t *testing.T) {

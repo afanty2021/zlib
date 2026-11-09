@@ -66,19 +66,27 @@ func TestLoadNetscapeCookiesRejectsInvalidFile(t *testing.T) {
 	}
 }
 
-func TestImportCookieSessionPersistsCookiesAndDomain(t *testing.T) {
+// A cookie login persists the session the login flow returns: cookies, the
+// normalized domain and the eapi mode must all survive the round trip through
+// session.json.
+func TestCookieLoginSessionPersistsCookiesDomainAndMode(t *testing.T) {
 	isolateConfigHome(t)
 	path := writeCookieFile(t, `# Netscape HTTP Cookie File
 .z-lib.gd	TRUE	/	TRUE	0	remix_userid	123
 .z-lib.gd	TRUE	/	TRUE	0	remix_userkey	secret
 `)
 
-	count, err := importCookieSession(path, "https://z-lib.gd", time.Now())
+	cookies, domain, err := parseCookieSession(path, "https://z-lib.gd", time.Now())
 	if err != nil {
-		t.Fatalf("importCookieSession() error = %v", err)
+		t.Fatalf("parseCookieSession() error = %v", err)
 	}
-	if count != 2 {
-		t.Errorf("importCookieSession() count = %d, want 2", count)
+	if len(cookies) != 2 {
+		t.Errorf("parseCookieSession() = %d cookies, want 2", len(cookies))
+	}
+	// Persist the way the login flows do: runLoginFlow hands back an
+	// unpersisted session carrying Mode eapi, and the caller saves it.
+	if err := config.SaveSession(config.Session{Cookies: cookies, Domain: domain, Mode: "eapi"}); err != nil {
+		t.Fatalf("SaveSession() error = %v", err)
 	}
 
 	session, err := config.LoadSession()
@@ -89,7 +97,10 @@ func TestImportCookieSessionPersistsCookiesAndDomain(t *testing.T) {
 		t.Errorf("session.Domain = %q, want https://z-lib.gd", session.Domain)
 	}
 	if session.Cookies["remix_userkey"] != "secret" {
-		t.Errorf("session cookies = %v, want imported cookie", session.Cookies)
+		t.Errorf("session cookies = %v, want the imported cookies", session.Cookies)
+	}
+	if session.Mode != "eapi" {
+		t.Errorf("session.Mode = %q, want eapi", session.Mode)
 	}
 }
 
@@ -129,48 +140,29 @@ func TestParseCookieSessionLeavesSessionFileUnchanged(t *testing.T) {
 
 // A cookie file can match the domain and still authenticate nothing. Saving it
 // makes every later command fail with an opaque "session expired" instead.
-func TestImportCookieSessionRejectsFileWithoutAuthCookies(t *testing.T) {
+func TestParseCookieSessionRejectsFileWithoutAuthCookies(t *testing.T) {
 	isolateConfigHome(t)
 	path := writeCookieFile(t, `# Netscape HTTP Cookie File
 .z-lib.gd	TRUE	/	TRUE	0	siteLanguage	en
 `)
 
-	_, err := importCookieSession(path, "https://z-lib.gd", time.Now())
+	_, _, err := parseCookieSession(path, "https://z-lib.gd", time.Now())
 	if err == nil {
-		t.Fatal("importCookieSession() error = nil, want a missing-auth-cookie error")
+		t.Fatal("parseCookieSession() error = nil, want a missing-auth-cookie error")
 	}
 	if !strings.Contains(err.Error(), "remix_userid") {
-		t.Errorf("importCookieSession() error = %v, want it to name the missing cookie", err)
+		t.Errorf("parseCookieSession() error = %v, want it to name the missing cookie", err)
 	}
 }
 
-func TestImportCookieSessionRejectsFileMissingUserKey(t *testing.T) {
+func TestParseCookieSessionRejectsFileMissingUserKey(t *testing.T) {
 	isolateConfigHome(t)
 	path := writeCookieFile(t, `# Netscape HTTP Cookie File
 .z-lib.gd	TRUE	/	TRUE	0	remix_userid	123
 `)
 
-	_, err := importCookieSession(path, "https://z-lib.gd", time.Now())
+	_, _, err := parseCookieSession(path, "https://z-lib.gd", time.Now())
 	if err == nil || !strings.Contains(err.Error(), "remix_userkey") {
-		t.Fatalf("importCookieSession() error = %v, want it to name remix_userkey", err)
-	}
-}
-
-func TestImportCookieSessionPersistsEAPIMode(t *testing.T) {
-	isolateConfigHome(t)
-	path := writeCookieFile(t, `# Netscape HTTP Cookie File
-.z-lib.gd	TRUE	/	TRUE	0	remix_userid	123
-.z-lib.gd	TRUE	/	TRUE	0	remix_userkey	secret
-`)
-
-	if _, err := importCookieSession(path, "https://z-lib.gd", time.Now(), "eapi"); err != nil {
-		t.Fatalf("importCookieSession() error = %v", err)
-	}
-	session, err := config.LoadSession()
-	if err != nil {
-		t.Fatalf("LoadSession() error = %v", err)
-	}
-	if session.Mode != "eapi" {
-		t.Errorf("session.Mode = %q, want eapi", session.Mode)
+		t.Fatalf("parseCookieSession() error = %v, want it to name remix_userkey", err)
 	}
 }

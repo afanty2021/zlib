@@ -104,7 +104,7 @@ func (r *downloadRotation) run(
 	usable, lookupErr := r.refreshAll()
 	if !usable {
 		if lookupErr != nil {
-			return fmt.Errorf("every account reached its daily limit, and the quota re-check failed too (%v); try again later", lookupErr)
+			return fmt.Errorf("%w, and the quota re-check failed too (%v); try again later", errAllAccountsExhausted, lookupErr)
 		}
 		return r.exhaustedError()
 	}
@@ -257,6 +257,8 @@ func (r *downloadRotation) refreshAll() (usable bool, lookupErr error) {
 
 // errAllAccountsExhausted lets callers tell the every-account-done state apart
 // from other download errors with errors.Is (future exit-code mapping, tests).
+// The quota-re-check-failed variant carries it too: no caller can retry its
+// way out of either, and the lookup error stays visible in the message text.
 var errAllAccountsExhausted = errors.New("every account reached its daily limit")
 
 // exhaustedError reports the all-accounts-done state — wrapping
