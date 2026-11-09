@@ -137,9 +137,10 @@ Success requires exit code 0 and the JSON `path`. Report that path. Other exit
 codes: `3` means the user must run `zlib login` in their own terminal; `4` is a
 network or mirror problem (suggest `zlib doctor`); `5` means the book was saved
 but Kindle or WeRead delivery failed (the JSON `kindle.error` or `weread.error`
-says why; do not download again); `130` means it was cancelled. If the command times out or fails, inspect
-the destination before retrying; a partial file or matching displayed size alone
-does not prove completion. Avoid repeating downloads after an uncertain outcome.
+says why; do not download again); `130` means it was cancelled. If the command
+times out or fails, inspect the destination before retrying; a partial file or
+matching displayed size alone does not prove completion. Avoid repeating
+downloads after an uncertain outcome.
 
 For history re-downloads, use `zlib history --download "id:hash"`. For delivery
 requested by the user, follow the bundled [Kindle skill](../kindle/SKILL.md).
