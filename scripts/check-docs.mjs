@@ -74,6 +74,17 @@ const rules = [
     find: line =>
       /^(?:<{7}|\|{7}|>{7})(?: .*)?$/.test(line) || /^={7}$/.test(line) ? [line.trim()] : [],
   },
+  {
+    // The label half of a conflict marker whose `>>>>>>>` line was deleted
+    // during resolution ("f583884 (feat: ...)"): the one rebase artifact the
+    // rule above cannot see. Requiring a conventional-commit word right
+    // after the paren keeps prose hex (book hashes, IPs) out of scope.
+    name: 'git log debris',
+    find: line =>
+      /^ ?[0-9a-f]{7,40} \((?:feat|fix|chore|docs|test|style|refactor|perf|build|ci|revert)[:)]/.test(line)
+        ? [line.trim()]
+        : [],
+  },
 ];
 
 const username = (() => {
