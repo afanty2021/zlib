@@ -93,6 +93,40 @@ func TestImportCookieSessionPersistsCookiesAndDomain(t *testing.T) {
 	}
 }
 
+// Parsing alone must leave session.json untouched: login flows persist only
+// after the account store knows the result, so a crash between the two
+// writes cannot leave session.json naming an account the store lacks.
+func TestParseCookieSessionLeavesSessionFileUnchanged(t *testing.T) {
+	isolateConfigHome(t)
+	if err := config.SaveSession(config.Session{
+		Cookies: map[string]string{"remix_userid": "old", "remix_userkey": "old-key"},
+		Domain:  "https://z-lib.gd",
+		Mode:    "eapi",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	path := writeCookieFile(t, `# Netscape HTTP Cookie File
+.z-lib.gd	TRUE	/	TRUE	0	remix_userid	77
+.z-lib.gd	TRUE	/	TRUE	0	remix_userkey	fresh-key
+`)
+
+	cookies, domain, err := parseCookieSession(path, "https://z-lib.gd", time.Now())
+	if err != nil {
+		t.Fatalf("parseCookieSession() error = %v", err)
+	}
+	if len(cookies) != 2 || cookies["remix_userkey"] != "fresh-key" || domain != "https://z-lib.gd" {
+		t.Fatalf("parseCookieSession() = %v (%s), want the parsed cookies", cookies, domain)
+	}
+
+	session, err := config.LoadSession()
+	if err != nil {
+		t.Fatalf("LoadSession() error = %v", err)
+	}
+	if session.Cookies["remix_userkey"] != "old-key" {
+		t.Fatalf("parseCookieSession must not touch session.json, got cookies %v", session.Cookies)
+	}
+}
+
 // A cookie file can match the domain and still authenticate nothing. Saving it
 // makes every later command fail with an opaque "session expired" instead.
 func TestImportCookieSessionRejectsFileWithoutAuthCookies(t *testing.T) {

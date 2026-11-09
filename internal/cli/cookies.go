@@ -126,35 +126,48 @@ func cookieDomainMatches(targetHost, cookieDomain string, includeSubdomains bool
 	return includeSubdomains && strings.HasSuffix(targetHost, "."+cookieDomain)
 }
 
-func importCookieSession(cookieFile, domain string, now time.Time, modes ...string) (int, error) {
+// parseCookieSession loads a Netscape cookie file, validates its domain and
+// authentication cookies, and returns them together with the normalized
+// domain. It does not touch session.json; persistence belongs to the caller.
+func parseCookieSession(cookieFile, domain string, now time.Time) (map[string]string, string, error) {
 	path, err := expandTilde(cookieFile)
 	if err != nil {
-		return 0, err
+		return nil, "", err
 	}
 	if strings.TrimSpace(domain) == "" {
-		return 0, fmt.Errorf("cookie domain is not configured")
+		return nil, "", fmt.Errorf("cookie domain is not configured")
 	}
 	domain, err = zlib.ParseAllowedDomain(domain)
 	if err != nil {
-		return 0, err
+		return nil, "", err
 	}
 
 	cookies, err := loadNetscapeCookies(path, domain, now)
 	if err != nil {
-		return 0, err
+		return nil, "", err
 	}
 	if len(cookies) == 0 {
-		return 0, fmt.Errorf("no unexpired root cookies match %s", domain)
+		return nil, "", fmt.Errorf("no unexpired root cookies match %s", domain)
 	}
 	// A file can match the domain and still carry nothing that authenticates.
 	// Rejecting it here beats saving a useless session and failing every later
 	// command with an opaque "session expired".
 	for _, name := range []string{"remix_userid", "remix_userkey"} {
 		if strings.TrimSpace(cookies[name]) == "" {
-			return 0, fmt.Errorf("cookie file has no %s cookie for %s; export it while logged in", name, domain)
+			return nil, "", fmt.Errorf("cookie file has no %s cookie for %s; export it while logged in", name, domain)
 		}
 	}
+	return cookies, domain, nil
+}
 
+// importCookieSession parses a cookie file and persists it as the current
+// session. Login flows that file the result into the account store call
+// parseCookieSession instead, so the store can be written first.
+func importCookieSession(cookieFile, domain string, now time.Time, modes ...string) (int, error) {
+	cookies, domain, err := parseCookieSession(cookieFile, domain, now)
+	if err != nil {
+		return 0, err
+	}
 	mode := ""
 	if len(modes) > 0 {
 		mode = modes[0]

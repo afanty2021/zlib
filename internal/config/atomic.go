@@ -29,6 +29,13 @@ func saveJSONAtomic(path string, v any) error {
 		tmp.Close()
 		return err
 	}
+	// Flush to disk before the rename: without the fsync, a crash right
+	// after the rename can leave the destination empty on some filesystems,
+	// destroying the only copy of the credentials.
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}

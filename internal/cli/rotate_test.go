@@ -116,6 +116,89 @@ func TestRunRotatesToNextAccountOnDailyLimit(t *testing.T) {
 	}
 }
 
+// A store entry that cannot produce a client must not abort the download:
+// the healthy accounts still get their turn, and the skip notice stays on
+// stderr like every other progress line.
+func TestRunSkipsCandidateThatFailsToBuild(t *testing.T) {
+	isolateConfigHome(t)
+
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", quotaPtr(3)), accountWithQuota("b", quotaPtr(3))},
+		},
+		exists: true,
+	}
+
+	attempts := 0
+	var runErr error
+	stdout, stderr := captureOutput(t, func() {
+		runErr = rotation.run(nil,
+			func(account config.Account) (*zlib.Client, error) {
+				if account.Name == "a" {
+					return nil, errors.New("no session cookies")
+				}
+				return nil, nil
+			},
+			func(c *zlib.Client) error {
+				attempts++
+				return nil
+			})
+	})
+	if runErr != nil {
+		t.Fatalf("run() error = %v", runErr)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want 1 (b only)", attempts)
+	}
+	if rotation.store.Active != "b" {
+		t.Fatalf("active = %q, want b", rotation.store.Active)
+	}
+	if stdout != "" {
+		t.Fatalf("skip notice must stay off stdout, got %q", stdout)
+	}
+	if !strings.Contains(stderr, "Skipping account a") {
+		t.Fatalf("skip notice missing from stderr:\n%s", stderr)
+	}
+}
+
+// When every candidate fails to build, the error names the last failing
+// account instead of masquerading as quota exhaustion — no refresh pass can
+// rescue a store that cannot produce a client at all.
+func TestRunBuildFailureOnEveryCandidateNamesAccount(t *testing.T) {
+	isolateConfigHome(t)
+
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", quotaPtr(3)), accountWithQuota("b", quotaPtr(3))},
+		},
+		exists: true,
+	}
+
+	attempts := 0
+	err := rotation.run(nil,
+		func(account config.Account) (*zlib.Client, error) {
+			return nil, errors.New("no session cookies")
+		},
+		func(c *zlib.Client) error {
+			attempts++
+			return nil
+		})
+	if err == nil {
+		t.Fatal("run() error = nil, want the build failure")
+	}
+	if attempts != 0 {
+		t.Fatalf("attempts = %d, want 0", attempts)
+	}
+	if !strings.Contains(err.Error(), "account b: no session cookies") {
+		t.Fatalf("run() error = %v, want it to name the failing account", err)
+	}
+	if errors.Is(err, errCandidatesExhausted) {
+		t.Fatalf("run() error = %v must not claim quota exhaustion", err)
+	}
+}
+
 // Rotation progress is interactive chrome: it must stay off stdout so a
 // --json download keeps stdout to the single result document exactly when
 // rotation fires. The full rotation lifecycle is exercised — mid-loop
@@ -252,6 +335,9 @@ func TestRunErrorsWhenEverythingExhausted(t *testing.T) {
 		func(c *zlib.Client) error { return nil })
 	if err == nil || !strings.Contains(err.Error(), "every account") {
 		t.Fatalf("run() error = %v, want all-accounts-exhausted error", err)
+	}
+	if !errors.Is(err, errAllAccountsExhausted) {
+		t.Fatalf("run() error = %v, want it to unwrap to errAllAccountsExhausted", err)
 	}
 }
 

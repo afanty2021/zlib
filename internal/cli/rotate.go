@@ -128,10 +128,19 @@ func (r *downloadRotation) attemptLoop(
 	if len(candidates) == 0 {
 		return errCandidatesExhausted
 	}
+	// A candidate whose store entry cannot produce a client (a hand-edited
+	// accounts.json with empty cookies, say) is skipped with a warning
+	// instead of aborting the whole download; the remaining healthy
+	// accounts still get their chance.
+	buildFailures := 0
+	var lastBuildErr error
 	for _, account := range candidates {
 		client, err := build(*account)
 		if err != nil {
-			return err
+			buildFailures++
+			lastBuildErr = fmt.Errorf("account %s: %w", account.Name, err)
+			fmt.Fprintf(os.Stderr, "%s Skipping account %s: %v\n", colorCyanFn(symbolInfo), account.Name, err)
+			continue
 		}
 		err = attempt(client)
 		switch {
@@ -162,6 +171,11 @@ func (r *downloadRotation) attemptLoop(
 			return err
 		}
 	}
+	if buildFailures == len(candidates) {
+		// No attempt was ever made, so quota refresh logic cannot help;
+		// surface the (account-named) load failure directly.
+		return lastBuildErr
+	}
 	return errCandidatesExhausted
 }
 
@@ -188,8 +202,15 @@ func (r *downloadRotation) confirmDailyLimit(account *config.Account, err error)
 		return false
 	}
 	account.TouchQuota(limits.DailyRemaining)
+	if limits.DailyRemaining <= 0 {
+		return true
+	}
+	// A stale quota cache was corrected, but the failure was not the
+	// quota's fault; persist the correction, then let attemptLoop's
+	// default branch return the original error (the rotate branch saves
+	// once more after MarkExhausted, so each path persists exactly once).
 	_ = r.saveStore()
-	return limits.DailyRemaining <= 0
+	return false
 }
 
 // fetchLimits looks up an account's current quota, through the test hook when
@@ -234,8 +255,13 @@ func (r *downloadRotation) refreshAll() (usable bool, lookupErr error) {
 	return usable, lookupErr
 }
 
-// exhaustedError reports the all-accounts-done state with each account's last
-// known remaining, so the user can see when to expect a reset.
+// errAllAccountsExhausted lets callers tell the every-account-done state apart
+// from other download errors with errors.Is (future exit-code mapping, tests).
+var errAllAccountsExhausted = errors.New("every account reached its daily limit")
+
+// exhaustedError reports the all-accounts-done state — wrapping
+// errAllAccountsExhausted — with each account's last known remaining, so the
+// user can see when to expect a reset.
 func (r *downloadRotation) exhaustedError() error {
 	parts := make([]string, 0, len(r.store.Accounts))
 	for _, account := range r.store.Accounts {
@@ -245,7 +271,7 @@ func (r *downloadRotation) exhaustedError() error {
 		}
 		parts = append(parts, fmt.Sprintf("%s (%s left)", account.Name, remaining))
 	}
-	return fmt.Errorf("daily download limit reached on every account: %s", strings.Join(parts, ", "))
+	return fmt.Errorf("%w: %s", errAllAccountsExhausted, strings.Join(parts, ", "))
 }
 
 // recordAccountQuota caches a freshly observed quota against the active

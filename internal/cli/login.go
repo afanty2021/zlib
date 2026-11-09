@@ -90,17 +90,15 @@ func runLoginFlow(ctx context.Context, stdout, stderr io.Writer, opts loginFlowO
 			lipgloss.Fprintf(stdout, "%s %s redirects to %s; logging in there.\n", colorCyan(symbolInfo), domain, resolved)
 			domain = resolved
 		}
-		count, err := importCookieSession(opts.CookieFile, domain, time.Now(), mode)
+		cookies, cookieDomain, err := parseCookieSession(opts.CookieFile, domain, time.Now())
 		if err != nil {
 			return config.Session{}, 0, fmt.Errorf("failed to import cookies: %w", err)
 		}
-		// importCookieSession persists session.json itself; read it back so the
-		// caller has the same session shape a credential login produces.
-		session, err := config.LoadSession()
-		if err != nil {
-			return config.Session{}, 0, fmt.Errorf("imported cookies but could not read them back: %w", err)
-		}
-		return session, count, nil
+		// Persisting is deliberately the caller's job: `zlib login` saves the
+		// returned session, and `accounts add` files it into the store first,
+		// so a crash between the two writes can never leave session.json
+		// naming an account the store does not know.
+		return config.Session{Cookies: cookies, Domain: cookieDomain, Mode: mode}, len(cookies), nil
 	}
 	// Decide whether to prompt from the flags, before the remembered email
 	// is filled in. Letting the prefill satisfy the check would make
