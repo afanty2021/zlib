@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/heartleo/zlib/internal/config"
+	"github.com/heartleo/zlib/internal/zlib"
 )
 
 // runAccountsCLI drives the real command tree against the already-isolated
@@ -164,6 +166,15 @@ func TestAccountsListJSONHidesCookies(t *testing.T) {
 }
 
 func TestLoginWritesThroughToActiveAccount(t *testing.T) {
+	// The login flow health-checks the domain before saving cookies. When
+	// this machine has no route to zlib.bz (domains rotate; CI may lack
+	// egress) the write-through cannot be exercised live, so skip instead of
+	// reporting a connectivity problem as a regression. Any status other
+	// than network_error means the site answered and the test must run.
+	if check := zlib.ProbeDomainWithOptions(context.Background(), "https://zlib.bz", zlib.DomainProbeOptions{Path: eapiProbePath}); check.Status == zlib.DomainStatusNetworkError {
+		t.Skipf("zlib.bz unreachable from this environment (%s); skipping the live login write-through", check.Status)
+	}
+
 	isolateConfigHome(t)
 	seedSession(t, "1")
 	if _, err := runAccountsCLI(t, "accounts", "import", "main"); err != nil {
