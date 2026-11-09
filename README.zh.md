@@ -156,7 +156,6 @@ codex plugin add zlib@zlib
 ```
 
 ### MCP 服务
- f583884 (feat: add multi-account download rotation)
 
 把 `zlib mcp` 注册为本地 stdio 服务。需已安装 `zlib` 并完成登录：
 

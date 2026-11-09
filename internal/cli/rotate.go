@@ -148,7 +148,7 @@ func (r *downloadRotation) attemptLoop(
 			}
 			return nil
 		case errors.Is(err, zlib.ErrDailyLimit) || r.confirmDailyLimit(account, err):
-			fmt.Printf("%s Account %s reached its daily limit; trying the next account.\n",
+			fmt.Fprintf(os.Stderr, "%s Account %s reached its daily limit; trying the next account.\n",
 				colorCyanFn(symbolInfo), account.Name)
 			account.MarkExhausted()
 			if err := r.saveStore(); err != nil {
@@ -212,7 +212,7 @@ func (r *downloadRotation) fetchLimits(account config.Account) (zlib.DownloadLim
 // does not expose the reset time, so a fresh lookup is the only way to notice
 // the quota came back.
 func (r *downloadRotation) refreshAll() (usable bool, lookupErr error) {
-	fmt.Printf("%s Attempts hit the daily limit everywhere; re-checking quotas with the server.\n", colorCyanFn(symbolInfo))
+	fmt.Fprintf(os.Stderr, "%s Attempts hit the daily limit everywhere; re-checking quotas with the server.\n", colorCyanFn(symbolInfo))
 	failures := 0
 	var lastErr error
 	for _, account := range rotationOrder(&r.store) {

@@ -116,6 +116,63 @@ func TestRunRotatesToNextAccountOnDailyLimit(t *testing.T) {
 	}
 }
 
+// Rotation progress is interactive chrome: it must stay off stdout so a
+// --json download keeps stdout to the single result document exactly when
+// rotation fires. The full rotation lifecycle is exercised — mid-loop
+// account switch plus the all-exhausted quota re-check — so both progress
+// messages are covered.
+func TestRunRotationProgressStaysOffStdout(t *testing.T) {
+	isolateConfigHome(t)
+
+	rotation := downloadRotation{
+		store: config.AccountStore{
+			Active:   "a",
+			Accounts: []config.Account{accountWithQuota("a", quotaPtr(1)), accountWithQuota("b", quotaPtr(5))},
+		},
+		exists: true,
+		limitsFetch: func(account config.Account) (zlib.DownloadLimit, error) {
+			// Both hit the limit on the first pass; the re-check revives
+			// only b.
+			if account.Name == "b" {
+				return zlib.DownloadLimit{DailyAllowed: 10, DailyRemaining: 1}, nil
+			}
+			return zlib.DownloadLimit{DailyAllowed: 10, DailyRemaining: 0}, nil
+		},
+	}
+
+	attempts := 0
+	var runErr error
+	stdout, stderr := captureOutput(t, func() {
+		runErr = rotation.run(nil,
+			func(account config.Account) (*zlib.Client, error) { return nil, nil },
+			func(c *zlib.Client) error {
+				attempts++
+				if attempts < 3 {
+					return fmt.Errorf("%w: Daily download limit reached", zlib.ErrDailyLimit)
+				}
+				return nil
+			})
+	})
+	if runErr != nil {
+		t.Fatalf("run() error = %v", runErr)
+	}
+	if attempts != 3 {
+		t.Fatalf("attempts = %d, want 3 (a, b, then b again after the re-check)", attempts)
+	}
+	if stdout != "" {
+		t.Fatalf("rotation must not write to stdout (--json keeps it to the result document), got %q", stdout)
+	}
+	for _, want := range []string{
+		"Account a reached its daily limit",
+		"Account b reached its daily limit",
+		"re-checking quotas",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("rotation notice %q missing from stderr:\n%s", want, stderr)
+		}
+	}
+}
+
 func TestRunReturnsOtherErrorsWithoutRotation(t *testing.T) {
 	isolateConfigHome(t)
 

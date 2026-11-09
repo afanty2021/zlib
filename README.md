@@ -162,7 +162,6 @@ codex plugin add zlib@zlib
 ```
 
 ### MCP server
- f583884 (feat: add multi-account download rotation)
 
 Register `zlib mcp` as a local stdio server. `zlib` must be on `PATH` and signed in:
 
